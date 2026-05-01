@@ -1,62 +1,194 @@
 const API_BASE = window.location.origin;
+const WS_URL = `ws://${window.location.host}`;
+let ws = null;
+let currentSection = 'overview';
+let allLogs = [];
 
-async function generateOTP() {
-  const phone = document.getElementById('phone').value.trim();
-  const resultDiv = document.getElementById('generate-result');
+document.addEventListener('DOMContentLoaded', () => {
+  setupNavigation();
+  setupWebSocket();
+  checkConnection();
+  loadOverview();
+  setInterval(checkConnection, 30000);
+});
+
+function setupWebSocket() {
+  ws = new WebSocket(WS_URL);
   
-  if (!phone) {
-    showResult(resultDiv, 'Informe um número de telefone válido', 'error');
-    return;
-  }
-
-  try {
-    const response = await fetch(`${API_BASE}/api/otp/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone })
-    });
+  ws.onopen = () => {
+    console.log('WebSocket conectado');
+    document.getElementById('websocket-status').className = 'status good';
+    document.getElementById('websocket-status').textContent = 'Conectado';
+    checkConnection();
+  };
+  
+  ws.onmessage = (event) => {
+    const { event: wsEvent } = JSON.parse(event.data);
+    console.log('WebSocket event:', wsEvent);
     
-    const data = await response.json();
-    if (data.success) {
-      showResult(resultDiv, 'OTP gerado e enviado com sucesso!', 'success');
-      document.getElementById('phone').value = '';
-      loadOTPs();
-    } else {
-      showResult(resultDiv, data.message || 'Erro ao gerar OTP', 'error');
+    switch(wsEvent) {
+      case 'otp-created':
+      case 'otp-verified':
+      case 'otp-deleted':
+        if (currentSection === 'otps' || currentSection === 'overview') loadOTPs();
+        if (currentSection === 'overview') loadOverview();
+        if (currentSection === 'logs') loadLogs();
+        break;
+      case 'user-created':
+        if (currentSection === 'users' || currentSection === 'overview') loadUsers();
+        if (currentSection === 'overview') loadOverview();
+        if (currentSection === 'logs') loadLogs();
+        break;
+      case 'password-reset':
+        if (currentSection === 'overview') loadOverview();
+        if (currentSection === 'logs') loadLogs();
+        break;
     }
-  } catch (error) {
-    showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+  };
+  
+  ws.onclose = () => {
+    console.log('WebSocket desconectado, tentando reconectar...');
+    document.getElementById('websocket-status').className = 'status bad';
+    document.getElementById('websocket-status').textContent = 'Desconectado';
+    setTimeout(setupWebSocket, 3000);
+  };
+  
+  ws.onerror = (error) => {
+    console.error('WebSocket erro:', error);
+  };
+}
+
+function setupNavigation() {
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const section = item.dataset.section;
+      
+      navItems.forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+      
+      document.querySelectorAll('.section-content').forEach(s => s.classList.add('hidden'));
+      document.getElementById(`${section}-section`).classList.remove('hidden');
+      
+      document.getElementById('section-title').textContent = item.textContent.trim();
+      currentSection = section;
+      refreshCurrentSection();
+    });
+  });
+}
+
+function refreshCurrentSection() {
+  switch(currentSection) {
+    case 'overview': loadOverview(); break;
+    case 'users': loadUsers(); break;
+    case 'otps': loadOTPs(); break;
+    case 'password-reset': break;
+    case 'settings': loadSettings(); break;
+    case 'logs': loadLogs(); break;
   }
 }
 
-async function verifyOTP() {
-  const phone = document.getElementById('verify-phone').value.trim();
-  const code = document.getElementById('verify-code').value.trim();
-  const resultDiv = document.getElementById('verify-result');
+async function checkConnection() {
+  const statusEl = document.getElementById('connection-status');
+  const dot = statusEl.querySelector('.status-dot');
+  const text = statusEl.querySelector('.status-text');
   
-  if (!phone || !code) {
-    showResult(resultDiv, 'Informe o telefone e o código', 'error');
-    return;
-  }
-
   try {
-    const response = await fetch(`${API_BASE}/api/otp/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, code })
-    });
-    
+    const response = await fetch(`${API_BASE}/api/status`);
     const data = await response.json();
-    if (data.success) {
-      showResult(resultDiv, 'OTP verificado com sucesso!', 'success');
-      document.getElementById('verify-phone').value = '';
-      document.getElementById('verify-code').value = '';
-      loadOTPs();
+    
+    if (data.supabase === 'connected') {
+      dot.className = 'status-dot online';
+      text.textContent = 'Online';
+      document.getElementById('supabase-status').className = 'status good';
+      document.getElementById('supabase-status').textContent = 'Conectado';
+      document.getElementById('supabase-conn-status').className = 'status good';
+      document.getElementById('supabase-conn-status').textContent = 'Conectado';
     } else {
-      showResult(resultDiv, data.message || 'Erro ao verificar OTP', 'error');
+      throw new Error('Supabase desconectado');
     }
   } catch (error) {
-    showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+    dot.className = 'status-dot offline';
+    text.textContent = 'Offline';
+    document.getElementById('supabase-status').className = 'status bad';
+    document.getElementById('supabase-status').textContent = 'Desconectado';
+    document.getElementById('supabase-conn-status').className = 'status bad';
+    document.getElementById('supabase-conn-status').textContent = 'Desconectado';
+  }
+  
+  document.getElementById('last-check').textContent = new Date().toLocaleTimeString('pt-BR');
+}
+
+async function loadOverview() {
+  try {
+    const [usersRes, otpsRes] = await Promise.all([
+      fetch(`${API_BASE}/api/users`),
+      fetch(`${API_BASE}/api/otps`)
+    ]);
+    
+    const usersData = await usersRes.json();
+    const otpsData = await otpsRes.json();
+    
+    const users = usersData.data || [];
+    const otps = otpsData.data || [];
+    
+    document.getElementById('total-users').textContent = users.length;
+    document.getElementById('total-otps').textContent = otps.length;
+    document.getElementById('verified-otps').textContent = otps.filter(o => o.verified).length;
+    
+    const emailLogs = allLogs.filter(l => l.type === 'email');
+    document.getElementById('email-sent').textContent = emailLogs.filter(l => l.message.includes('sent')).length;
+    document.getElementById('password-resets').textContent = '0';
+    
+    const activityEl = document.getElementById('recent-activity');
+    const recentOTPs = otps.slice(0, 5);
+    if (recentOTPs.length > 0) {
+      activityEl.innerHTML = recentOTPs.map(otp => `
+        <div class="activity-item">
+          <span class="activity-icon"><i class="fas fa-mobile-alt"></i></span>
+          <div class="activity-info">
+            <p><strong>OTP ${otp.verified ? 'verificado' : 'gerado'}</strong> para ${otp.telefone}</p>
+            <small>${new Date(otp.created_at).toLocaleString('pt-BR')}</small>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      activityEl.innerHTML = '<p class="empty-state">Nenhuma atividade recente</p>';
+    }
+  } catch (error) {
+    console.error('Erro ao carregar visão geral:', error);
+  }
+}
+
+async function loadUsers() {
+  const tbody = document.getElementById('users-body');
+    tbody.innerHTML = '<tr><td colspan="7">Carregando...</td></tr>';
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/users`);
+    const { data } = await response.json();
+    
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7">Nenhum usuário encontrado</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(user => `
+      <tr>
+        <td>${user.nome} ${user.sobrenome || ''}</td>
+        <td>${user.email || '-'}</td>
+        <td>${user.telefone || '-'}</td>
+        <td>${new Date(user.criado_em).toLocaleString('pt-BR')}</td>
+        <td><span class="badge ${user.ativo ? 'success' : 'error'}">${user.ativo ? 'Ativo' : 'Inativo'}</span></td>
+        <td>
+          <button class="btn-icon" onclick="viewUser('${user.telefone || user.email}')" title="Ver detalhes"><i class="fas fa-eye"></i></button>
+          <button class="btn-icon" onclick="resetUserPassword('${user.telefone || user.email}')" title="Redefinir senha"><i class="fas fa-key"></i></button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (error) {
+      tbody.innerHTML = '<tr><td colspan="7">Erro ao carregar usuários</td></tr>';
   }
 }
 
@@ -82,13 +214,13 @@ async function loadOTPs() {
       
       return `
         <tr>
-          <td>${otp.phone}</td>
-          <td>${otp.code}</td>
+          <td>${otp.telefone}</td>
+          <td><strong>${otp.code}</strong></td>
           <td class="status-${status}">${statusText}</td>
           <td>${expiresAt.toLocaleString('pt-BR')}</td>
           <td>${otp.attempts || 0}</td>
           <td>
-            <button class="delete-btn" onclick="deleteOTP('${otp.id}')">Excluir</button>
+            <button class="btn-icon" onclick="deleteOTP('${otp.id}')" title="Excluir"><i class="fas fa-trash"></i></button>
           </td>
         </tr>
       `;
@@ -98,56 +230,472 @@ async function loadOTPs() {
   }
 }
 
-async function loadUsers() {
-  const tbody = document.getElementById('users-body');
-  tbody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
+async function generateOTPFromDashboard() {
+  const phone = document.getElementById('phone-otp').value.trim();
+  const resultDiv = document.getElementById('otp-result');
   
-  try {
-    const response = await fetch(`${API_BASE}/api/users`);
-    const { data } = await response.json();
-    
-    if (!data || data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="2">Nenhum usuário encontrado</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = data.map(user => `
-      <tr>
-        <td>${user.phone}</td>
-        <td>${new Date(user.created_at).toLocaleString('pt-BR')}</td>
-      </tr>
-    `).join('');
-  } catch (error) {
-    tbody.innerHTML = '<tr><td colspan="2">Erro ao carregar usuários</td></tr>';
+  if (!phone) {
+    showResult(resultDiv, "Informe um número de telefone válido", "error");
+    return;
   }
-}
 
-async function deleteOTP(id) {
-  if (!confirm('Tem certeza que deseja excluir este OTP?')) return;
-  
   try {
-    const response = await fetch(`${API_BASE}/api/otp/${id}`, {
-      method: 'DELETE'
+    const response = await fetch(`${API_BASE}/api/otp/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
     });
     
     const data = await response.json();
     if (data.success) {
-      loadOTPs();
+      showResult(resultDiv, "OTP gerado e enviado com sucesso!", "success");
+      document.getElementById('phone-otp').value = '';
+    } else {
+      showResult(resultDiv, data.message || "Erro ao gerar OTP", "error");
     }
   } catch (error) {
-    alert('Erro ao excluir OTP');
+    showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+  }
+}
+
+async function resetPasswordFromDashboard() {
+  const contact = document.getElementById('reset-contact').value.trim();
+  const method = document.querySelector('input[name="reset-method"]:checked').value;
+  const resultDiv = document.getElementById('reset-result');
+  
+  if (!contact) {
+    showResult(resultDiv, 'Informe um telefone ou email', 'error');
+    return;
+  }
+  
+  if (method === 'sms') {
+    // SMS method - need OTP code
+    const otp = document.getElementById('reset-otp').value.trim();
+    const password = document.getElementById('reset-password').value;
+    const confirmPassword = document.getElementById('reset-password-confirm').value;
+    
+    if (!otp || !password) {
+      showResult(resultDiv, 'Preencha o código OTP e a nova senha', 'error');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      showResult(resultDiv, 'As senhas não coincidem', 'error');
+      return;
+    }
+    
+    if (password.length < 6) {
+      showResult(resultDiv, 'A senha deve ter pelo menos 6 caracteres', 'error');
+      return;
+    }
+    
+    // First verify OTP
+    try {
+      const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: contact, code: otp })
+      });
+      const verifyData = await verifyRes.json();
+      
+      if (!verifyData.success) {
+        showResult(resultDiv, verifyData.message || 'Código inválido', 'error');
+        return;
+      }
+      
+      // Then reset password
+      const resetRes = await fetch(`${API_BASE}/api/password/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: contact, newPassword: password })
+      });
+      
+      const resetData = await resetRes.json();
+      if (resetData.success) {
+        showResult(resultDiv, 'Senha redefinida com sucesso!', 'success');
+        document.getElementById('reset-contact').value = '';
+        document.getElementById('reset-otp').value = '';
+        document.getElementById('reset-password').value = '';
+        document.getElementById('reset-password-confirm').value = '';
+      } else {
+        showResult(resultDiv, resetData.message || 'Erro ao redefinir senha', 'error');
+      }
+    } catch (error) {
+      showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+    }
+    
+    } else {
+    // Email method - Supabase Auth flow
+    const code = document.getElementById('reset-email-code').value.trim();
+    const password = document.getElementById('reset-password-email').value;
+    const confirmPassword = document.getElementById('reset-password-confirm-email').value;
+    
+    if (!code || !password) {
+      showResult(resultDiv, 'Preencha o código e a nova senha', 'error');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      showResult(resultDiv, 'As senhas não coincidem', 'error');
+      return;
+    }
+    
+    if (password.length < 6) {
+      showResult(resultDiv, 'A senha deve ter pelo menos 6 caracteres', 'error');
+      return;
+    }
+    
+    try {
+      // For email, we need to verify the OTP code stored in our table
+      const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: contact, code })
+      });
+      
+      const verifyData = await verifyRes.json();
+      
+      if (!verifyData.success) {
+        showResult(resultDiv, verifyData.message || 'Código inválido ou expirado', 'error');
+        return;
+      }
+      
+      // Reset password in our database
+      const resetRes = await fetch(`${API_BASE}/api/password/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: contact, newPassword: password })
+      });
+      
+      const resetData = await resetRes.json();
+      if (resetData.success) {
+        showResult(resultDiv, 'Senha redefinida com sucesso!', 'success');
+        document.getElementById('reset-contact').value = '';
+        document.getElementById('reset-email-code').value = '';
+        document.getElementById('reset-password-email').value = '';
+        document.getElementById('reset-password-confirm-email').value = '';
+      } else {
+        showResult(resultDiv, resetData.message || 'Erro ao redefinir senha', 'error');
+      }
+    } catch (error) {
+      showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+    }
+  }
+}
+    
+    if (password !== confirmPassword) {
+      showResult(resultDiv, 'As senhas não coincidem', 'error');
+      return;
+    }
+    
+    if (password.length < 6) {
+      showResult(resultDiv, 'A senha deve ter pelo menos 6 caracteres', 'error');
+      return;
+    }
+    
+    try {
+      // Verify code via OTP endpoint
+      const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: contact, code })
+      });
+      const verifyData = await verifyRes.json();
+      
+      if (!verifyData.success) {
+        showResult(resultDiv, verifyData.message || 'Código inválido', 'error');
+        return;
+      }
+      
+      // Reset password
+      const resetRes = await fetch(`${API_BASE}/api/password/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: contact, newPassword: password })
+      });
+      
+      const resetData = await resetRes.json();
+      if (resetData.success) {
+        showResult(resultDiv, 'Senha redefinida com sucesso!', 'success');
+        document.getElementById('reset-contact').value = '';
+        document.getElementById('reset-email-code').value = '';
+        document.getElementById('reset-password-email').value = '';
+        document.getElementById('reset-password-confirm-email').value = '';
+      } else {
+        showResult(resultDiv, resetData.message || 'Erro ao redefinir senha', 'error');
+      }
+    } catch (error) {
+      showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+    }
+  }
+}
+
+let currentConfirmCallback = null;
+
+async function deleteOTP(id) {
+  currentConfirmCallback = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/otp/${id}`, { method: 'DELETE' });
+      const data = await response.json();
+      closeModal();
+      if (data.success) {
+        showModal('Sucesso', 'OTP excluído com sucesso!', 'success');
+      }
+    } catch (error) {
+      showModal('Erro', 'Erro ao excluir OTP', 'error');
+    }
+  };
+  
+  showConfirm('Confirmar Exclusão', 'Tem certeza que deseja excluir este OTP?');
+}
+
+function toggleResetMethod() {
+  const method = document.querySelector('input[name="reset-method"]:checked').value;
+  const smsFields = document.getElementById('sms-fields');
+  const emailField = document.getElementById('email-field');
+  const btnSendCode = document.getElementById('btn-send-code');
+  const btnResetPassword = document.getElementById('btn-reset-password');
+  
+  if (method === 'sms') {
+    smsFields.style.display = 'block';
+    emailField.style.display = 'none';
+    btnSendCode.style.display = 'none';
+    btnResetPassword.style.display = 'block';
+  } else {
+    smsFields.style.display = 'none';
+    emailField.style.display = 'block';
+    btnSendCode.style.display = 'block';
+    btnResetPassword.style.display = 'none';
+  }
+}
+
+async function sendResetCode() {
+  const contact = document.getElementById('reset-contact').value.trim();
+  const method = document.querySelector('input[name="reset-method"]:checked').value;
+  const resultDiv = document.getElementById('reset-result');
+  
+  if (!contact) {
+    showResult(resultDiv, 'Informe um telefone ou email', 'error');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/otp/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: contact, method })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      showResult(resultDiv, `Código enviado via ${method === 'email' ? 'email (Supabase Auth)' : 'SMS'}! Verifique sua caixa de entrada.`, 'success');
+    } else {
+      showResult(resultDiv, data.message || 'Erro ao enviar código', 'error');
+    }
+  } catch (error) {
+    showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+  }
+}
+
+async function viewUser(phoneOrEmail) {
+  try {
+    const response = await fetch(`${API_BASE}/api/users`);
+    const { data } = await response.json();
+    const user = data.find(u => u.telefone === phoneOrEmail || u.email === phoneOrEmail);
+    
+    if (!user) {
+      showModal('Erro', 'Usuário não encontrado', 'error');
+      return;
+    }
+    
+    const statusClass = user.ativo ? 'success' : 'error';
+    const statusText = user.ativo ? 'Ativo' : 'Inativo';
+    const fotoUrl = user.foto_url ? `<img src="${user.foto_url}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:15px;border:2px solid #e8e8e8;">` : 
+      `<div style="width:80px;height:80px;border-radius:50%;background:#f0f4ff;display:flex;align-items:center;justify-content:center;margin-bottom:15px;color:#4361ee;font-size:1.5rem;"><i class="fas fa-user"></i></div>`;
+    
+    document.getElementById('modal-title').textContent = 'Detalhes do Usuário';
+    document.getElementById('modal-body').innerHTML = `
+      <div style="text-align:center;margin-bottom:20px;">
+        ${fotoUrl}
+        <h3 style="color:#1a1a2e;margin-bottom:5px;">${user.nome} ${user.sobrenome || ''}</h3>
+        <span class="badge ${statusClass}" style="font-size:0.8rem;">${user.papel}</span>
+      </div>
+      <div style="display:grid;gap:12px;">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <span style="color:#888;font-size:0.85rem;">Email</span>
+          <span style="color:#1a1a2e;font-size:0.85rem;">${user.email || '-'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <span style="color:#888;font-size:0.85rem;">Telefone</span>
+          <span style="color:#1a1a2e;font-size:0.85rem;">${user.telefone || '-'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <span style="color:#888;font-size:0.85rem;">Papel</span>
+          <span style="color:#1a1a2e;font-size:0.85rem;">${user.papel}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <span style="color:#888;font-size:0.85rem;">Status</span>
+          <span class="badge ${statusClass}" style="font-size:0.8rem;">${statusText}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <span style="color:#888;font-size:0.85rem;">Criado em</span>
+          <span style="color:#1a1a2e;font-size:0.85rem;">${new Date(user.criado_em).toLocaleString('pt-BR')}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;">
+          <span style="color:#888;font-size:0.85rem;">Atualizado em</span>
+          <span style="color:#1a1a2e;font-size:0.85rem;">${new Date(user.atualizado_em).toLocaleString('pt-BR')}</span>
+        </div>
+      </div>
+    `;
+    document.getElementById('modal-footer').innerHTML = `
+      <button class="btn-secondary" onclick="closeModal()">Fechar</button>
+      <button class="btn-primary" onclick="resetUserPassword('${user.telefone || user.email}')">Redefinir Senha</button>
+    `;
+    document.getElementById('modal-overlay').classList.add('active');
+  } catch (error) {
+    showModal('Erro', 'Erro ao carregar detalhes do usuário', 'error');
+  }
+}
+
+function resetUserPassword(phone) {
+  document.getElementById('reset-phone').value = phone;
+  document.querySelector('.nav-item[data-section="password-reset"]').click();
+}
+
+function loadSettings() {
+  const url = 'ewyckxscedklztarigha.supabase.co';
+  document.getElementById('supabase-url').textContent = url;
+  
+  const isHTTPS = window.location.protocol === 'https:';
+  document.getElementById('https-status').textContent = isHTTPS ? 'Ativo (HTTPS)' : 'Inativo (HTTP)';
+  document.getElementById('https-status').className = isHTTPS ? 'status good' : 'status warning';
+}
+
+function testSupabaseConnection() {
+  checkConnection();
+  showModal('Teste de Conexão', 'Teste de conexão executado! Verifique o status acima.', 'info');
+}
+
+function testSMS() {
+  const phone = prompt('Digite um número para teste de SMS:');
+  if (phone) {
+    fetch(`${API_BASE}/api/otp/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    }).then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showModal('SMS Enviado', 'SMS enviado com sucesso!', 'success');
+        } else {
+          showModal('Erro', 'Erro ao enviar SMS: ' + data.message, 'error');
+        }
+      });
+  }
+}
+
+async function loadLogs() {
+  const logsList = document.getElementById('logs-list');
+  logsList.innerHTML = '<p class="empty-state">Carregando logs...</p>';
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/logs`);
+    const { data } = await response.json();
+    
+    if (!data || data.length === 0) {
+      logsList.innerHTML = '<p class="empty-state">Nenhum log encontrado</p>';
+      allLogs = [];
+      return;
+    }
+    
+    allLogs = data;
+    displayLogs(allLogs);
+  } catch (error) {
+    logsList.innerHTML = '<p class="empty-state">Erro ao carregar logs</p>';
+  }
+}
+
+function displayLogs(logs) {
+  const logsList = document.getElementById('logs-list');
+  
+  if (logs.length === 0) {
+    logsList.innerHTML = '<p class="empty-state">Nenhum log encontrado</p>';
+    return;
+  }
+  
+  logsList.innerHTML = logs.map(log => `
+    <div class="log-item log-${log.type}">
+      <span class="log-icon"><i class="${log.icon}"></i></span>
+      <div class="log-info">
+        <p>${log.message}</p>
+        <small>${new Date(log.time).toLocaleString('pt-BR')}</small>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterLogs(type) {
+  document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  if (type === 'all') {
+    displayLogs(allLogs);
+  } else {
+    const filtered = allLogs.filter(log => {
+      if (type === 'otp') return log.type.includes('otp');
+      return log.type === type;
+    });
+    displayLogs(filtered);
   }
 }
 
 function showResult(element, message, type) {
   element.textContent = message;
   element.className = `result ${type}`;
+  element.classList.remove('hidden');
   setTimeout(() => {
-    element.className = 'result';
+    element.classList.add('hidden');
+    element.className = 'result hidden';
   }, 5000);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadOTPs();
-  loadUsers();
-});
+function showModal(title, message, type = 'info') {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+      <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}" 
+         style="font-size: 2rem; color: ${type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : '#3b82f6'};"></i>
+      <p style="font-size: 1.1rem;">${message}</p>
+    </div>
+  `;
+  document.getElementById('modal-footer').innerHTML = `
+    <button class="btn-primary" onclick="closeModal()">OK</button>
+  `;
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function showConfirm(title, message) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = `
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+      <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #f59e0b;"></i>
+      <p style="font-size: 1.1rem;">${message}</p>
+    </div>
+  `;
+  document.getElementById('modal-footer').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+    <button class="btn-primary" onclick="executeConfirm()">Confirmar</button>
+  `;
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function executeConfirm() {
+  if (currentConfirmCallback) {
+    currentConfirmCallback();
+    currentConfirmCallback = null;
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+}

@@ -1,43 +1,43 @@
 const bcrypt = require('bcryptjs');
 const supabase = require('./supabaseClient');
 
-const resetPassword = async (phone, newPassword) => {
-  // Verify if OTP was validated
+const resetPassword = async (contact, newPassword) => {
+  // Verify if OTP was validated (phone field stores both phone and email)
   const { data: otp, error: otpError } = await supabase
     .from('otps')
     .select('*')
-    .eq('phone', phone)
+    .eq('phone', contact)
     .eq('verified', true)
     .single();
-
+  
   if (otpError || !otp) {
-    return { success: false, message: 'OTP not verified for this phone' };
+    return { success: false, message: 'Código não verificado ou expirado' };
   }
-
+  
   const passwordHash = await bcrypt.hash(newPassword, 10);
-
-  // Check if user exists in usuarios table (using telefone field)
+  
+  // Check if user exists in usuarios table (by telefone OR email)
   const { data: user, error: userError } = await supabase
     .from('usuarios')
     .select('*')
-    .eq('telefone', phone)
+    .or(`telefone.eq.${contact},email.eq.${contact}`)
     .single();
-
+  
   if (userError || !user) {
-    return { success: false, message: 'Usuário não encontrado' };
+    return { success: false, message: 'Usuário não encontrado na tabela usuarios' };
   }
-
+  
   // Update password (field is 'senha' in your table)
   const { error: updateError } = await supabase
     .from('usuarios')
-    .update({ password_hash: passwordHash })
-    .eq('telefone', phone);
+    .update({ senha: passwordHash })
+    .or(`telefone.eq.${contact},email.eq.${contact}`);
     
   if (updateError) throw updateError;
-
+  
   // Clean up OTP
-  await supabase.from('otps').delete().eq('phone', phone);
-
+  await supabase.from('otps').delete().eq('phone', contact);
+  
   return { success: true, message: 'Senha redefinida com sucesso' };
 };
 

@@ -3,70 +3,359 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OTP Dashboard</title>
+  <title>Admin Dashboard - OTP System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>OTP System Dashboard</h1>
-  </header>
-
-  <main>
-    <section class="card">
-      <h2>Gerar Novo OTP</h2>
-      <div class="form-group">
-        <input type="tel" id="phone" placeholder="Número de telefone (244...)" required>
-        <button onclick="generateOTP()">Gerar OTP</button>
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Título</h3>
+        <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
       </div>
-      <div id="generate-result" class="result"></div>
-    </section>
-
-    <section class="card">
-      <h2>Verificar OTP</h2>
-      <div class="form-group">
-        <input type="tel" id="verify-phone" placeholder="Número de telefone" required>
-        <input type="text" id="verify-code" placeholder="Código OTP" required>
-        <button onclick="verifyOTP()">Verificar</button>
+      <div class="modal-body" id="modal-body">
+        Conteúdo
       </div>
-      <div id="verify-result" class="result"></div>
-    </section>
-
-    <section class="card">
-      <h2>OTPs Recentes</h2>
-      <button onclick="loadOTPs()" class="refresh-btn">Atualizar</button>
-      <div class="table-container">
-        <table id="otps-table">
-          <thead>
-            <tr>
-              <th>Telefone</th>
-              <th>Código</th>
-              <th>Status</th>
-              <th>Expira em</th>
-              <th>Tentativas</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody id="otps-body"></tbody>
-        </table>
+      <div class="modal-footer" id="modal-footer">
+        <button class="btn-secondary" onclick="closeModal()">Fechar</button>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <section class="card">
-      <h2>Usuários Cadastrados</h2>
-      <button onclick="loadUsers()" class="refresh-btn">Atualizar</button>
-      <div class="table-container">
-        <table id="users-table">
-          <thead>
-            <tr>
-              <th>Telefone</th>
-              <th>Criado em</th>
-            </tr>
-          </thead>
-          <tbody id="users-body"></tbody>
-        </table>
+  <div class="dashboard">
+    <aside class="sidebar">
+      <div class="logo">
+        <h2><i class="fas fa-shield-alt"></i> OTP CAOP-B Sistema</h2>
       </div>
-    </section>
-  </main>
+      <nav>
+        <a href="#" class="nav-item active" data-section="overview">
+          <i class="fas fa-chart-bar"></i> Visão Geral
+        </a>
+        <a href="#" class="nav-item" data-section="users">
+          <i class="fas fa-users"></i> Usuários
+        </a>
+        <a href="#" class="nav-item" data-section="otps">
+          <i class="fas fa-mobile-alt"></i> OTPs
+        </a>
+        <a href="#" class="nav-item" data-section="password-reset">
+          <i class="fas fa-key"></i> Redefinir Senha
+        </a>
+        <a href="#" class="nav-item" data-section="settings">
+          <i class="fas fa-cog"></i> Configurações
+        </a>
+        <a href="#" class="nav-item" data-section="logs">
+          <i class="fas fa-clipboard-list"></i> Logs
+        </a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <h1 id="section-title">Visão Geral</h1>
+    <p class="subtitle">OTP CAOP-B Sistema - Gestão de Verificação</p>
+        <div class="header-actions">
+          <button onclick="refreshCurrentSection()" class="btn-refresh"><i class="fas fa-sync-alt"></i> Atualizar</button>
+          <div class="connection-status" id="connection-status">
+            <span class="status-dot"></span>
+            <span class="status-text">Verificando...</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="section-content" id="overview-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+            <div class="stat-info">
+              <h3 id="total-users">0</h3>
+              <p>Usuários</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-mobile-alt"></i></div>
+            <div class="stat-info">
+              <h3 id="total-otps">0</h3>
+              <p>OTPs Gerados</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-info">
+              <h3 id="verified-otps">0</h3>
+              <p>OTPs Verificados</p>
+            </div>
+          </div>
+            <div class="stat-card">
+              <div class="stat-icon"><i class="fas fa-envelope"></i></div>
+              <div class="stat-info">
+                <h3 id="email-sent">0</h3>
+                <p>Emails Enviados</p>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon"><i class="fas fa-key"></i></div>
+              <div class="stat-info">
+                <h3 id="password-resets">0</h3>
+                <p>Redefinições</p>
+              </div>
+            </div>
+        </div>
+
+        <div class="card">
+          <h2><i class="fas fa-server"></i> Status do Sistema</h2>
+          <div class="system-status">
+            <div class="status-item">
+              <span class="label">Supabase</span>
+              <span class="status" id="supabase-status">Verificando...</span>
+            </div>
+            <div class="status-item">
+              <span class="label">API Backend</span>
+              <span class="status good">Online</span>
+            </div>
+            <div class="status-item">
+              <span class="label">WebSocket</span>
+              <span class="status" id="websocket-status">Conectando...</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Última Verificação</span>
+              <span id="last-check">-</span>
+            </div>
+          </div>
+        </div>
+
+          <div class="card">
+            <h2><i class="fas fa-history"></i> Atividade Recente</h2>
+            <div id="recent-activity">Carregando...</div>
+          </div>
+          
+          <div class="card">
+            <h2><i class="fas fa-chart-pie"></i> Status de Envio</h2>
+            <div class="status-grid">
+              <div class="status-item">
+                <span class="label">SMS</span>
+                <span class="status" id="sms-status">Verificando...</span>
+              </div>
+              <div class="status-item">
+                <span class="label">Email (Supabase)</span>
+                <span class="status" id="email-status">Verificando...</span>
+              </div>
+              <div class="status-item">
+                <span class="label">Tempo de Expiração</span>
+                <span>20 minutos</span>
+              </div>
+            </div>
+          </div>
+      </div>
+
+      <div class="section-content hidden" id="users-section">
+        <div class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-users"></i> Usuários Cadastrados</h2>
+            <button onclick="loadUsers()" class="btn-primary"><i class="fas fa-sync-alt"></i> Atualizar</button>
+          </div>
+          <div class="table-container">
+            <table id="users-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Email</th>
+                  <th>Telefone</th>
+                  <th>Papel</th>
+                  <th>Criado em</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="users-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-content hidden" id="otps-section">
+        <div class="card">
+          <div class="card-header">
+            <h2><i class="fas fa-mobile-alt"></i> Gerenciar OTPs</h2>
+            <div class="card-actions">
+              <input type="tel" id="phone-otp" placeholder="Número para gerar OTP" class="input-inline">
+              <button onclick="generateOTPFromDashboard()" class="btn-primary"><i class="fas fa-plus"></i> Gerar OTP</button>
+              <button onclick="loadOTPs()" class="btn-secondary"><i class="fas fa-sync-alt"></i> Atualizar</button>
+            </div>
+          </div>
+          <div id="otp-result" class="result hidden"></div>
+          <div class="table-container">
+            <table id="otps-table">
+              <thead>
+                <tr>
+                  <th>Telefone</th>
+                  <th>Código</th>
+                  <th>Status</th>
+                  <th>Expira em</th>
+                  <th>Tentativas</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="otps-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-content hidden" id="password-reset-section">
+              <div class="card">
+                <h2><i class="fas fa-key"></i> Redefinir Senha (Telefone/Email)</h2>
+                <p class="card-description">Use esta função para redefinir a senha de um usuário via Telefone (SMS) ou Email (Supabase Auth).</p>
+                
+                <div class="form-container">
+                  <div class="form-group">
+                    <label for="reset-contact">Telefone ou Email do Usuário</label>
+                    <input type="text" id="reset-contact" placeholder="244... ou email@exemplo.com" class="form-input">
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>Metodo de Envio</label>
+                    <div style="display: flex; gap: 10px; margin-top: 8px;">
+                      <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                        <input type="radio" name="reset-method" value="sms" checked onchange="toggleResetMethod()"> <i class="fas fa-mobile-alt"></i> SMS
+                      </label>
+                      <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                        <input type="radio" name="reset-method" value="email" onchange="toggleResetMethod()"> <i class="fas fa-envelope"></i> Email
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div id="sms-fields">
+                    <div class="form-group">
+                      <label for="reset-password">Nova Senha</label>
+                      <input type="password" id="reset-password" placeholder="Nova senha" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label for="reset-password-confirm">Confirmar Nova Senha</label>
+                      <input type="password" id="reset-password-confirm" placeholder="Confirmar senha" class="form-input">
+                    </div>
+                    <div class="form-group" id="otp-field" style="display: none;">
+                      <label for="reset-otp">Código OTP Recebido</label>
+                      <input type="text" id="reset-otp" placeholder="Digite o código SMS" class="form-input">
+                    </div>
+                  </div>
+                  
+                  <div id="email-field" style="display: none;">
+                    <div class="form-group">
+                      <label for="reset-email-code">Código Recebido por Email</label>
+                      <input type="text" id="reset-email-code" placeholder="Digite o código do email" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label for="reset-password-email">Nova Senha</label>
+                      <input type="password" id="reset-password-email" placeholder="Nova senha" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label for="reset-password-confirm-email">Confirmar Nova Senha</label>
+                      <input type="password" id="reset-password-confirm-email" placeholder="Confirmar senha" class="form-input">
+                    </div>
+                  </div>
+                  
+                  <div id="reset-result" class="result hidden"></div>
+                  
+                  <button onclick="sendResetCode()" class="btn-secondary btn-large" id="btn-send-code" style="margin-bottom: 10px;">
+                    <i class="fas fa-paper-plane"></i> Enviar Código
+                  </button>
+                  <button onclick="resetPasswordFromDashboard()" class="btn-primary btn-large" id="btn-reset-password">
+                    <i class="fas fa-key"></i> Redefinir Senha
+                  </button>
+                </div>
+              </div>
+
+        <div class="card">
+          <h2><i class="fas fa-info-circle"></i> Lógica de Redefinição de Senha</h2>
+          <div class="logic-info">
+            <h3>Como funciona:</h3>
+            <ol>
+              <li>Usuário solicita redefinição no app mobile</li>
+              <li>Sistema gera OTP e envia por SMS</li>
+              <li>Usuário insere o código no app</li>
+              <li>App valida o código via <code>/api/otp/verify</code></li>
+              <li>App envia nova senha via <code>/api/password/reset</code></li>
+              <li>Senha é atualizada no banco de dados</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-content hidden" id="settings-section">
+        <div class="card">
+          <h2><i class="fas fa-cog"></i> Configurações do Sistema</h2>
+          <div class="settings-grid">
+            <div class="setting-item">
+              <h3><i class="fas fa-database"></i> Conexão Supabase</h3>
+              <div class="setting-content">
+                <p><strong>URL:</strong> <code id="supabase-url">Carregando...</code></p>
+                <p><strong>Status:</strong> <span id="supabase-conn-status">Verificando...</span></p>
+                <button onclick="testSupabaseConnection()" class="btn-secondary"><i class="fas fa-plug"></i> Testar Conexão</button>
+              </div>
+            </div>
+            <div class="setting-item">
+              <h3><i class="fas fa-sms"></i> Configuração SMS</h3>
+              <div class="setting-content">
+                <p><strong>Provedor:</strong> <span id="sms-provider">Twilio</span></p>
+                <p><strong>Status:</strong> <span id="sms-status">Configurado</span></p>
+                <button onclick="testSMS()" class="btn-secondary"><i class="fas fa-paper-plane"></i> Enviar SMS Teste</button>
+              </div>
+            </div>
+            <div class="setting-item">
+              <h3><i class="fas fa-clock"></i> Configuração OTP</h3>
+              <div class="setting-content">
+                <p><strong>Tempo de Expiração:</strong> <span id="otp-expiry">5 minutos</span></p>
+                <p><strong>Máximo Tentativas:</strong> <span id="otp-attempts">3</span></p>
+              </div>
+            </div>
+            <div class="setting-item">
+              <h3><i class="fas fa-shield-alt"></i> Segurança</h3>
+              <div class="setting-content">
+                <p><strong>Hash Password:</strong> bcryptjs</p>
+                <p><strong>HTTPS:</strong> <span id="https-status">Verificando...</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><i class="fas fa-project-diagram"></i> Lógica de Criação de Usuário e Envio de OTP</h2>
+          <div class="logic-info">
+            <h3>Fluxo de Registro:</h3>
+            <ol>
+              <li>Usuário insere telefone no app mobile</li>
+              <li>App chama <code>/api/register</code> com telefone e senha</li>
+              <li>Sistema verifica se telefone já existe</li>
+              <li>Senha é hasheada com bcryptjs</li>
+              <li>Usuário é criado na tabela <code>usuarios</code></li>
+              <li>Sistema gera OTP automático</li>
+              <li>OTP é enviado por SMS via Twilio</li>
+              <li>Usuário recebe código e verifica via <code>/api/otp/verify</code></li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-content hidden" id="logs-section">
+        <div class="card">
+          <h2><i class="fas fa-clipboard-list"></i> Logs do Sistema</h2>
+          <div class="logs-container">
+            <div class="log-filters">
+              <button onclick="filterLogs('all')" class="btn-filter active">Todos</button>
+              <button onclick="filterLogs('otp')" class="btn-filter">OTPs</button>
+              <button onclick="filterLogs('user')" class="btn-filter">Usuários</button>
+              <button onclick="filterLogs('password')" class="btn-filter">Senhas</button>
+              <button onclick="filterLogs('error')" class="btn-filter">Erros</button>
+            </div>
+            <div id="logs-list" class="logs-list">
+              <p class="empty-state">Carregando logs...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
 
   <script src="script.js"></script>
 </body>
