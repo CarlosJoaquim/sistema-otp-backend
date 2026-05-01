@@ -5,12 +5,12 @@ const supabase = require('./supabaseClient');
 const createOTP = async (phone, checkUserExists = true) => {
   // Verificar se o usuário existe no banco (para redefinição de senha)
   if (checkUserExists) {
-  const { data: user, error: userError } = await supabase
-       .from('usuarios')
-       .select('phone')
-       .eq('phone', phone)
-       .single();
-    
+    const { data: user, error: userError } = await supabase
+      .from('usuarios')
+      .select('telefone')
+      .eq('telefone', phone)
+      .single();
+     
     if (userError || !user) {
       return { success: false, message: 'Número não encontrado. Verifique o número ou registe-se primeiro.' };
     }

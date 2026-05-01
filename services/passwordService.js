@@ -31,7 +31,7 @@ const resetPassword = async (phone, newPassword) => {
   const { error: updateError } = await supabase
     .from('usuarios')
     .update({ password_hash: passwordHash })
-    .eq('phone', phone);
+    .eq('telefone', phone);
     
   if (updateError) throw updateError;
 

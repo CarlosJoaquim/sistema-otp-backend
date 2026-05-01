@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OTP Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>OTP System Dashboard</h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Gerar Novo OTP</h2>
+      <div class="form-group">
+        <input type="tel" id="phone" placeholder="Número de telefone (244...)" required>
+        <button onclick="generateOTP()">Gerar OTP</button>
+      </div>
+      <div id="generate-result" class="result"></div>
+    </section>
+
+    <section class="card">
+      <h2>Verificar OTP</h2>
+      <div class="form-group">
+        <input type="tel" id="verify-phone" placeholder="Número de telefone" required>
+        <input type="text" id="verify-code" placeholder="Código OTP" required>
+        <button onclick="verifyOTP()">Verificar</button>
+      </div>
+      <div id="verify-result" class="result"></div>
+    </section>
+
+    <section class="card">
+      <h2>OTPs Recentes</h2>
+      <button onclick="loadOTPs()" class="refresh-btn">Atualizar</button>
+      <div class="table-container">
+        <table id="otps-table">
+          <thead>
+            <tr>
+              <th>Telefone</th>
+              <th>Código</th>
+              <th>Status</th>
+              <th>Expira em</th>
+              <th>Tentativas</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="otps-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Usuários Cadastrados</h2>
+      <button onclick="loadUsers()" class="refresh-btn">Atualizar</button>
+      <div class="table-container">
+        <table id="users-table">
+          <thead>
+            <tr>
+              <th>Telefone</th>
+              <th>Criado em</th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
