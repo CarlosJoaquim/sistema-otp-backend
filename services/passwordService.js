@@ -2,11 +2,11 @@ const bcrypt = require('bcryptjs');
 const supabase = require('./supabaseClient');
 
 const resetPassword = async (contact, newPassword) => {
-  // Verify if OTP was validated (phone field stores both phone and email)
+  // Verify if OTP was validated (check by phone OR email)
   const { data: otp, error: otpError } = await supabase
     .from('otps')
     .select('*')
-    .eq('phone', contact)
+    .or(`phone.eq.${contact},email.eq.${contact}`)
     .eq('verified', true)
     .single();
   
@@ -36,7 +36,7 @@ const resetPassword = async (contact, newPassword) => {
   if (updateError) throw updateError;
   
   // Clean up OTP
-  await supabase.from('otps').delete().eq('phone', contact);
+  await supabase.from('otps').delete().or(`phone.eq.${contact},email.eq.${contact}`);
   
   return { success: true, message: 'Senha redefinida com sucesso' };
 };

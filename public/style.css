@@ -781,7 +781,146 @@ tr:hover {
   }
   
   .header-actions {
-    width: 100%;
+    width:100%;
     justify-content: space-between;
   }
+}
+
+/* Melhorias para o fluxo de 2 passos - Redefinição de Senha */
+#step1, #step2 {
+  background: #f8fafc;
+  padding: 25px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+#step1 h3, #step2 h3 {
+  margin-top: 0;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#step2 {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+#step2 h3 {
+  color: #16a34a;
+}
+
+#otp-code-field {
+  margin-top: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+  border-radius: 8px;
+  border-left: 4px solid #4361ee;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#otp-code-field .form-group {
+  margin-bottom: 0;
+}
+
+#otp-code-field label {
+  color: #1e40af;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+#otp-code-field input {
+  border: 2px solid #bfdbfe;
+  font-size: 1.2rem;
+  letter-spacing: 3px;
+  text-align: center;
+  font-weight: bold;
+  color: #1e40af;
+}
+
+#otp-code-field input:focus {
+  border-color: #4361ee;
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+}
+
+#reset-result, #reset-password-result {
+  margin-top: 15px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+#reset-result.success, #reset-password-result.success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+#reset-result.error, #reset-password-result.error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+/* Melhorar botões do fluxo */
+#btn-send-code, #btn-verify-code, #btn-reset-password {
+  min-width: 160px;
+}
+
+#btn-verify-code {
+  background: #4361ee;
+  border-color: #4361ee;
+}
+
+#btn-verify-code:hover {
+  background: #3b50d9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3);
+}
+
+#btn-reset-password {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border: none;
+  font-weight: 600;
+}
+
+#btn-reset-password:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+/* Radio buttons mais bonitos */
+input[type="radio"] {
+  accent-color: #4361ee;
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsivo para os passos */
+@media (max-width: 768px) {
+  #step1, #step2 {
+    padding: 15px;
+  }
+  
+  #otp-code-field {
+    padding: 15px;
+  }
+  
+  #btn-send-code, #btn-verify-code {
+    width: 100%;
+  }
+}
 }

@@ -1,12 +1,15 @@
 const API_BASE = window.location.origin;
-const WS_URL = `ws://${window.location.host}`;
+// WebSocket desativado para Vercel (serverless não suporta)
+// const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+// let ws = null;
 let ws = null;
 let currentSection = 'overview';
 let allLogs = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   setupNavigation();
-  setupWebSocket();
+  // WebSocket desativado para Vercel
+  // setupWebSocket();
   checkConnection();
   loadOverview();
   setInterval(checkConnection, 30000);
@@ -91,8 +94,11 @@ function refreshCurrentSection() {
 
 async function checkConnection() {
   const statusEl = document.getElementById('connection-status');
+  if (!statusEl) return;
+  
   const dot = statusEl.querySelector('.status-dot');
   const text = statusEl.querySelector('.status-text');
+  if (!dot || !text) return;
   
   try {
     const response = await fetch(`${API_BASE}/api/status`);
@@ -101,23 +107,28 @@ async function checkConnection() {
     if (data.supabase === 'connected') {
       dot.className = 'status-dot online';
       text.textContent = 'Online';
-      document.getElementById('supabase-status').className = 'status good';
-      document.getElementById('supabase-status').textContent = 'Conectado';
-      document.getElementById('supabase-conn-status').className = 'status good';
-      document.getElementById('supabase-conn-status').textContent = 'Conectado';
+      const supabaseStatus = document.getElementById('supabase-status');
+      if (supabaseStatus) {
+        supabaseStatus.className = 'status good';
+        supabaseStatus.textContent = 'Conectado';
+      }
     } else {
       throw new Error('Supabase desconectado');
     }
   } catch (error) {
     dot.className = 'status-dot offline';
     text.textContent = 'Offline';
-    document.getElementById('supabase-status').className = 'status bad';
-    document.getElementById('supabase-status').textContent = 'Desconectado';
-    document.getElementById('supabase-conn-status').className = 'status bad';
-    document.getElementById('supabase-conn-status').textContent = 'Desconectado';
+    const supabaseStatus = document.getElementById('supabase-status');
+    if (supabaseStatus) {
+      supabaseStatus.className = 'status bad';
+      supabaseStatus.textContent = 'Desconectado';
+    }
   }
   
-  document.getElementById('last-check').textContent = new Date().toLocaleTimeString('pt-BR');
+  const lastCheck = document.getElementById('last-check');
+  if (lastCheck) {
+    lastCheck.textContent = new Date().toLocaleTimeString('pt-BR');
+  }
 }
 
 async function loadOverview() {
@@ -258,7 +269,8 @@ async function generateOTPFromDashboard() {
   }
 }
 
-async function resetPasswordFromDashboard() {
+// PASSO 1: Enviar código
+async function sendResetCode() {
   const contact = document.getElementById('reset-contact').value.trim();
   const method = document.querySelector('input[name="reset-method"]:checked').value;
   const resultDiv = document.getElementById('reset-result');
@@ -268,165 +280,114 @@ async function resetPasswordFromDashboard() {
     return;
   }
   
-  if (method === 'sms') {
-    // SMS method - need OTP code
-    const otp = document.getElementById('reset-otp').value.trim();
-    const password = document.getElementById('reset-password').value;
-    const confirmPassword = document.getElementById('reset-password-confirm').value;
+  try {
+    const response = await fetch(`${API_BASE}/api/otp/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: contact, method })
+    });
     
-    if (!otp || !password) {
-      showResult(resultDiv, 'Preencha o código OTP e a nova senha', 'error');
-      return;
-    }
-    
-    if (password !== confirmPassword) {
-      showResult(resultDiv, 'As senhas não coincidem', 'error');
-      return;
-    }
-    
-    if (password.length < 6) {
-      showResult(resultDiv, 'A senha deve ter pelo menos 6 caracteres', 'error');
-      return;
-    }
-    
-    // First verify OTP
-    try {
-      const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: contact, code: otp })
-      });
-      const verifyData = await verifyRes.json();
-      
-      if (!verifyData.success) {
-        showResult(resultDiv, verifyData.message || 'Código inválido', 'error');
-        return;
-      }
-      
-      // Then reset password
-      const resetRes = await fetch(`${API_BASE}/api/password/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: contact, newPassword: password })
-      });
-      
-      const resetData = await resetRes.json();
-      if (resetData.success) {
-        showResult(resultDiv, 'Senha redefinida com sucesso!', 'success');
-        document.getElementById('reset-contact').value = '';
-        document.getElementById('reset-otp').value = '';
-        document.getElementById('reset-password').value = '';
-        document.getElementById('reset-password-confirm').value = '';
-      } else {
-        showResult(resultDiv, resetData.message || 'Erro ao redefinir senha', 'error');
-      }
-    } catch (error) {
-      showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
-    }
-    
+    const data = await response.json();
+    if (data.success) {
+      showResult(resultDiv, `Código enviado via ${method === 'email' ? 'email' : 'SMS'}! Verifique sua caixa de entrada.`, 'success');
+      // Mostrar campo para digitar o código
+      document.getElementById('otp-code-field').style.display = 'block';
+      // Scroll para o campo
+      document.getElementById('otp-code-field').scrollIntoView({ behavior: 'smooth' });
     } else {
-    // Email method - Supabase Auth flow
-    const code = document.getElementById('reset-email-code').value.trim();
-    const password = document.getElementById('reset-password-email').value;
-    const confirmPassword = document.getElementById('reset-password-confirm-email').value;
-    
-    if (!code || !password) {
-      showResult(resultDiv, 'Preencha o código e a nova senha', 'error');
-      return;
+      showResult(resultDiv, data.message || 'Erro ao enviar código', 'error');
     }
-    
-    if (password !== confirmPassword) {
-      showResult(resultDiv, 'As senhas não coincidem', 'error');
-      return;
-    }
-    
-    if (password.length < 6) {
-      showResult(resultDiv, 'A senha deve ter pelo menos 6 caracteres', 'error');
-      return;
-    }
-    
-    try {
-      // For email, we need to verify the OTP code stored in our table
-      const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: contact, code })
-      });
-      
-      const verifyData = await verifyRes.json();
-      
-      if (!verifyData.success) {
-        showResult(resultDiv, verifyData.message || 'Código inválido ou expirado', 'error');
-        return;
-      }
-      
-      // Reset password in our database
-      const resetRes = await fetch(`${API_BASE}/api/password/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: contact, newPassword: password })
-      });
-      
-      const resetData = await resetRes.json();
-      if (resetData.success) {
-        showResult(resultDiv, 'Senha redefinida com sucesso!', 'success');
-        document.getElementById('reset-contact').value = '';
-        document.getElementById('reset-email-code').value = '';
-        document.getElementById('reset-password-email').value = '';
-        document.getElementById('reset-password-confirm-email').value = '';
-      } else {
-        showResult(resultDiv, resetData.message || 'Erro ao redefinir senha', 'error');
-      }
-    } catch (error) {
-      showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
-    }
+  } catch (error) {
+    showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
   }
 }
+
+// PASSO 1: Validar código e prosseguir para Passo 2
+async function verifyCodeAndProceed() {
+  const contact = document.getElementById('reset-contact').value.trim();
+  const otp = document.getElementById('reset-otp').value.trim();
+  const resultDiv = document.getElementById('reset-result');
+  
+  if (!otp) {
+    showResult(resultDiv, 'Digite o código recebido', 'error');
+    return;
+  }
+  
+  try {
+    const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: contact, code: otp })
+    });
     
-    if (password !== confirmPassword) {
-      showResult(resultDiv, 'As senhas não coincidem', 'error');
+    const verifyData = await verifyRes.json();
+    
+    if (!verifyData.success) {
+      showResult(resultDiv, verifyData.message || 'Código inválido', 'error');
       return;
     }
     
-    if (password.length < 6) {
-      showResult(resultDiv, 'A senha deve ter pelo menos 6 caracteres', 'error');
-      return;
-    }
+    // Sucesso! Ocultar Passo 1 e mostrar Passo 2
+    showResult(resultDiv, 'Código validado com sucesso! Agora defina sua nova senha.', 'success');
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = 'block';
     
-    try {
-      // Verify code via OTP endpoint
-      const verifyRes = await fetch(`${API_BASE}/api/otp/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: contact, code })
-      });
-      const verifyData = await verifyRes.json();
-      
-      if (!verifyData.success) {
-        showResult(resultDiv, verifyData.message || 'Código inválido', 'error');
-        return;
-      }
-      
-      // Reset password
-      const resetRes = await fetch(`${API_BASE}/api/password/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: contact, newPassword: password })
-      });
-      
-      const resetData = await resetRes.json();
-      if (resetData.success) {
-        showResult(resultDiv, 'Senha redefinida com sucesso!', 'success');
-        document.getElementById('reset-contact').value = '';
-        document.getElementById('reset-email-code').value = '';
-        document.getElementById('reset-password-email').value = '';
-        document.getElementById('reset-password-confirm-email').value = '';
-      } else {
-        showResult(resultDiv, resetData.message || 'Erro ao redefinir senha', 'error');
-      }
-    } catch (error) {
-      showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+  } catch (error) {
+    showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
+  }
+}
+
+// PASSO 2: Redefinir senha após validação
+async function resetPasswordStep2() {
+  const contact = document.getElementById('reset-contact').value.trim();
+  const password = document.getElementById('reset-password-new').value;
+  const confirmPassword = document.getElementById('reset-password-confirm-new').value;
+  const resultDiv = document.getElementById('reset-password-result');
+  
+  if (!password || !confirmPassword) {
+    showResult(resultDiv, 'Preencha a nova senha e a confirmação', 'error');
+    return;
+  }
+  
+  if (password !== confirmPassword) {
+    showResult(resultDiv, 'As senhas não coincidem', 'error');
+    return;
+  }
+  
+  if (password.length < 6) {
+    showResult(resultDiv, 'A senha deve ter pelo menos 6 caracteres', 'error');
+    return;
+  }
+  
+  try {
+    const resetRes = await fetch(`${API_BASE}/api/password/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: contact, newPassword: password })
+    });
+    
+    const resetData = await resetRes.json();
+    
+    if (resetData.success) {
+      showResult(resultDiv, 'Senha redefinida com sucesso!', 'success');
+      // Limpar campos
+      document.getElementById('reset-contact').value = '';
+      document.getElementById('reset-otp').value = '';
+      document.getElementById('reset-password-new').value = '';
+      document.getElementById('reset-password-confirm-new').value = '';
+      // Voltar para Passo 1 após 2 segundos
+      setTimeout(() => {
+        document.getElementById('step2').style.display = 'none';
+        document.getElementById('step1').style.display = 'block';
+        document.getElementById('otp-code-field').style.display = 'none';
+        document.getElementById('reset-result').className = 'result hidden';
+        document.getElementById('reset-password-result').className = 'result hidden';
+      }, 2000);
+    } else {
+      showResult(resultDiv, resetData.message || 'Erro ao redefinir senha', 'error');
     }
+  } catch (error) {
+    showResult(resultDiv, 'Erro de conexão com o servidor', 'error');
   }
 }
 
@@ -451,22 +412,13 @@ async function deleteOTP(id) {
 
 function toggleResetMethod() {
   const method = document.querySelector('input[name="reset-method"]:checked').value;
-  const smsFields = document.getElementById('sms-fields');
-  const emailField = document.getElementById('email-field');
-  const btnSendCode = document.getElementById('btn-send-code');
-  const btnResetPassword = document.getElementById('btn-reset-password');
-  
-  if (method === 'sms') {
-    smsFields.style.display = 'block';
-    emailField.style.display = 'none';
-    btnSendCode.style.display = 'none';
-    btnResetPassword.style.display = 'block';
-  } else {
-    smsFields.style.display = 'none';
-    emailField.style.display = 'block';
-    btnSendCode.style.display = 'block';
-    btnResetPassword.style.display = 'none';
-  }
+  // Reset para Passo 1
+  document.getElementById('step1').style.display = 'block';
+  document.getElementById('step2').style.display = 'none';
+  // NÃO esconder o otp-code-field - deixar visível
+  document.getElementById('reset-otp').value = '';
+  document.getElementById('reset-result').className = 'result hidden';
+  document.getElementById('reset-password-result').className = 'result hidden';
 }
 
 async function sendResetCode() {

@@ -204,17 +204,20 @@
 
       <div class="section-content hidden" id="password-reset-section">
               <div class="card">
-                <h2><i class="fas fa-key"></i> Redefinir Senha (Telefone/Email)</h2>
-                <p class="card-description">Use esta função para redefinir a senha de um usuário via Telefone (SMS) ou Email (Supabase Auth).</p>
+                <h2><i class="fas fa-key"></i> Redefinir Senha</h2>
+                <p class="card-description">Passo 1: Envie o código OTP. Passo 2: Redefina a senha.</p>
                 
-                <div class="form-container">
+                <!-- PASSO 1: Enviar/Validar Código -->
+                <div id="step1" class="form-container">
+                  <h3 style="margin-bottom: 15px; color: #4361ee;"><i class="fas fa-paper-plane"></i> Passo 1: Enviar e Validar Código</h3>
+                  
                   <div class="form-group">
-                    <label for="reset-contact">Telefone ou Email do Usuário</label>
+                    <label for="reset-contact">Telefone ou Email</label>
                     <input type="text" id="reset-contact" placeholder="244... ou email@exemplo.com" class="form-input">
                   </div>
                   
                   <div class="form-group">
-                    <label>Metodo de Envio</label>
+                    <label>Método de Envio</label>
                     <div style="display: flex; gap: 10px; margin-top: 8px;">
                       <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
                         <input type="radio" name="reset-method" value="sms" checked onchange="toggleResetMethod()"> <i class="fas fa-mobile-alt"></i> SMS
@@ -225,58 +228,56 @@
                     </div>
                   </div>
                   
-                  <div id="sms-fields">
+                  <div id="otp-code-field">
                     <div class="form-group">
-                      <label for="reset-password">Nova Senha</label>
-                      <input type="password" id="reset-password" placeholder="Nova senha" class="form-input">
-                    </div>
-                    <div class="form-group">
-                      <label for="reset-password-confirm">Confirmar Nova Senha</label>
-                      <input type="password" id="reset-password-confirm" placeholder="Confirmar senha" class="form-input">
-                    </div>
-                    <div class="form-group" id="otp-field" style="display: none;">
-                      <label for="reset-otp">Código OTP Recebido</label>
-                      <input type="text" id="reset-otp" placeholder="Digite o código SMS" class="form-input">
-                    </div>
-                  </div>
-                  
-                  <div id="email-field" style="display: none;">
-                    <div class="form-group">
-                      <label for="reset-email-code">Código Recebido por Email</label>
-                      <input type="text" id="reset-email-code" placeholder="Digite o código do email" class="form-input">
-                    </div>
-                    <div class="form-group">
-                      <label for="reset-password-email">Nova Senha</label>
-                      <input type="password" id="reset-password-email" placeholder="Nova senha" class="form-input">
-                    </div>
-                    <div class="form-group">
-                      <label for="reset-password-confirm-email">Confirmar Nova Senha</label>
-                      <input type="password" id="reset-password-confirm-email" placeholder="Confirmar senha" class="form-input">
+                      <label for="reset-otp">Código Recebido</label>
+                      <input type="text" id="reset-otp" placeholder="Digite o código recebido por email" class="form-input">
                     </div>
                   </div>
                   
                   <div id="reset-result" class="result hidden"></div>
                   
-                  <button onclick="sendResetCode()" class="btn-secondary btn-large" id="btn-send-code" style="margin-bottom: 10px;">
-                    <i class="fas fa-paper-plane"></i> Enviar Código
-                  </button>
-                  <button onclick="resetPasswordFromDashboard()" class="btn-primary btn-large" id="btn-reset-password">
+                  <div style="display: flex; gap: 10px;">
+                    <button onclick="sendResetCode()" class="btn-secondary btn-large" id="btn-send-code">
+                      <i class="fas fa-paper-plane"></i> Enviar Código
+                    </button>
+                    <button onclick="verifyCodeAndProceed()" class="btn-primary btn-large" id="btn-verify-code">
+                      <i class="fas fa-check"></i> Validar Código
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- PASSO 2: Redefinir Senha (inicialmente oculto) -->
+                <div id="step2" class="form-container" style="display: none; margin-top: 20px; border-top: 2px solid #e8e8e8; padding-top: 20px;">
+                  <h3 style="margin-bottom: 15px; color: #22c55e;"><i class="fas fa-lock"></i> Passo 2: Nova Senha</h3>
+                  
+                  <div class="form-group">
+                    <label for="reset-password-new">Nova Senha</label>
+                    <input type="password" id="reset-password-new" placeholder="Nova senha (mín. 6 caracteres)" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label for="reset-password-confirm-new">Confirmar Nova Senha</label>
+                    <input type="password" id="reset-password-confirm-new" placeholder="Confirmar senha" class="form-input">
+                  </div>
+                  
+                  <div id="reset-password-result" class="result hidden"></div>
+                  
+                  <button onclick="resetPasswordStep2()" class="btn-success btn-large" id="btn-reset-password">
                     <i class="fas fa-key"></i> Redefinir Senha
                   </button>
                 </div>
               </div>
-
+              
         <div class="card">
-          <h2><i class="fas fa-info-circle"></i> Lógica de Redefinição de Senha</h2>
+          <h2><i class="fas fa-info-circle"></i> Lógica de Redefinição</h2>
           <div class="logic-info">
             <h3>Como funciona:</h3>
             <ol>
-              <li>Usuário solicita redefinição no app mobile</li>
-              <li>Sistema gera OTP e envia por SMS</li>
-              <li>Usuário insere o código no app</li>
-              <li>App valida o código via <code>/api/otp/verify</code></li>
-              <li>App envia nova senha via <code>/api/password/reset</code></li>
-              <li>Senha é atualizada no banco de dados</li>
+              <li>Digite telefone/email e escolha o método</li>
+              <li>Clique em "Enviar Código" - o código será enviado</li>
+              <li>Digite o código recebido e clique "Validar Código"</li>
+              <li>Após validação, digite a nova senha no Passo 2</li>
+              <li>Clique em "Redefinir Senha" para concluir</li>
             </ol>
           </div>
         </div>

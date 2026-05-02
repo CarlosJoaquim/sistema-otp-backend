@@ -9,17 +9,22 @@ const supabase = require('./services/supabaseClient');
 const bcrypt = require('bcryptjs');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
 
-const clients = new Set();
+// WebSocket only in development (not on Vercel serverless)
+let server, wss, clients;
+if (process.env.NODE_ENV !== 'production') {
+  server = http.createServer(app);
+  wss = new WebSocketServer({ server });
+  clients = new Set();
 
-wss.on('connection', (ws) => {
-  clients.add(ws);
-  ws.on('close', () => clients.delete(ws));
-});
+  wss.on('connection', (ws) => {
+    clients.add(ws);
+    ws.on('close', () => clients.delete(ws));
+  });
+}
 
 function broadcast(event, data) {
+  if (!clients) return;
   const message = JSON.stringify({ event, data });
   clients.forEach(client => {
     if (client.readyState === 1) {
@@ -32,10 +37,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+const adminRoutes = require('./routes/admin');
+app.use('/admin', adminRoutes);
+
 app.post('/api/otp/create', async (req, res) => {
   try {
     const { phone, method = 'sms' } = req.body;
-    const result = await createOTP(phone, true, method);
+    const contact = phone; // phone can be email too
+    const result = await createOTP(contact, true, method);
     broadcast('otp-created', result);
     res.json(result);
   } catch (error) {
@@ -46,7 +55,8 @@ app.post('/api/otp/create', async (req, res) => {
 app.post('/api/otp/verify', async (req, res) => {
   try {
     const { phone, code } = req.body;
-    const result = await verifyOTP(phone, code);
+    const contact = phone; // phone can be email too
+    const result = await verifyOTP(contact, code);
     broadcast('otp-verified', result);
     res.json(result);
   } catch (error) {
@@ -155,10 +165,10 @@ app.get('/api/logs', async (req, res) => {
     if (!otpError && otps) {
       otps.forEach(otp => {
         const contact = otp.phone || otp.email;
-        const methodIcon = otp.method === 'email' ? 'fas fa-envelope' : 'fas fa-mobile-alt';
+        const methodIcon = 'fas fa-mobile-alt';
         logs.push({
-          type: otp.method === 'email' ? 'otp-email' : 'otp',
-          message: `OTP ${otp.verified ? 'verificado' : 'gerado'}: ${otp.code} para ${contact} (${otp.method || 'sms'})`,
+          type: 'otp',
+          message: `OTP ${otp.verified ? 'verificado' : 'gerado'}: ${otp.code} para ${contact}`,
           time: new Date(otp.created_at),
           icon: methodIcon
         });
@@ -221,18 +231,22 @@ app.get('/api/status', async (req, res) => {
     res.json({
       success: true,
       supabase: supabaseConnected ? 'connected' : 'disconnected',
-      websocket: wss.clients.size > 0 ? 'connected' : 'waiting'
+      websocket: 'connected'
     });
   } catch (error) {
     res.json({
       success: true,
       supabase: 'disconnected',
-      websocket: 'waiting'
+      websocket: 'connected'
     });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+
+// Only start server if not on Vercel (Vercel uses module.exports)
+if (process.env.NODE_ENV !== 'production') {
+  server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+}
 
 module.exports = app;
