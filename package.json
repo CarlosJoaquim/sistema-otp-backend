@@ -1,27 +1,13 @@
 {
-  "name": "sms-otp-backend",
+  "name": "sistema-otp-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "OTP System - Monorepo (Backend + Frontend)",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "@supabase/supabase-js": "^2.105.1",
-    "axios": "^1.15.2",
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "ws": "^8.20.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  }
+  "license": "ISC"
 }
