@@ -1,15 +1,26 @@
 {
-  "name": "sistema-otp-backend-monorepo",
+  "name": "sistema-otp-backend",
   "version": "1.0.0",
-  "description": "OTP System - Monorepo (Backend + Frontend)",
+  "description": "OTP System - Next.js Monolith with TypeScript",
   "scripts": {
-    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build",
-    "start": "cd backend && npm start"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "bcryptjs": "^3.0.3",
+    "next": "^14.2.35",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.12",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.0.0"
   }
 }
