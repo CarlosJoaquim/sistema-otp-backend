@@ -91,50 +91,6 @@ export default function Dashboard() {
     }
   };
 
-  const loadUsers = async () => {
-    try {
-      const base = API_BASE || window.location.origin;
-      const response = await fetch(`${base}/api/users`);
-      const { data } = await response.json();
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
-    }
-  };
-
-  const loadOtps = async () => {
-    try {
-      const base = API_BASE || window.location.origin;
-      const response = await fetch(`${base}/api/otps`);
-      const { data } = await response.json();
-      setOtps(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar OTPs:', error);
-    }
-  };
-
-  const loadLogs = async () => {
-    try {
-      const base = API_BASE || window.location.origin;
-      const response = await fetch(`${base}/api/logs`);
-      const { data } = await response.json();
-      setLogs(data || []);
-      setAllLogs(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar logs:', error);
-    }
-  };
-
-  const refreshCurrentSection = () => {
-    switch(currentSection) {
-      case 'overview': loadOverview(); break;
-      case 'users': loadUsers(); break;
-      case 'otps': loadOtps(); break;
-      case 'logs': loadLogs(); break;
-      default: break;
-    }
-  };
-
   const showResult = (message, type) => {
     setResetResult({ message, type });
     setTimeout(() => {
@@ -239,57 +195,6 @@ export default function Dashboard() {
     }
   };
 
-  const deleteOTP = async (id) => {
-    if (!confirm('Tem certeza que deseja excluir este OTP?')) return;
-    
-    try {
-      const base = API_BASE || window.location.origin;
-      const response = await fetch(`${base}/api/otp/${id}`, { method: 'DELETE' });
-      const data = await response.json();
-      if (data.success) {
-        alert('OTP excluído com sucesso!');
-        loadOtps();
-      }
-    } catch (error) {
-      alert('Erro ao excluir OTP');
-    }
-  };
-
-  const viewUser = async (phoneOrEmail) => {
-    try {
-      const base = API_BASE || window.location.origin;
-      const response = await fetch(`${base}/api/users`);
-      const { data } = await response.json();
-      const user = data.find(u => u.telefone === phoneOrEmail || u.email === phoneOrEmail);
-      
-      if (!user) {
-        alert('Usuário não encontrado');
-        return;
-      }
-      
-      alert(`Usuário: ${user.nome} ${user.sobrenome || ''}\nEmail: ${user.email || '-'}\nTelefone: ${user.telefone || '-'}\nStatus: ${user.ativo ? 'Ativo' : 'Inativo'}`);
-    } catch (error) {
-      alert('Erro ao carregar detalhes do usuário');
-    }
-  };
-
-  const resetUserPassword = (phone) => {
-    setResetContact(phone);
-    setCurrentSection('password-reset');
-  };
-
-  const filterLogs = (type) => {
-    if (type === 'all') {
-      setLogs(allLogs);
-    } else {
-      const filtered = allLogs.filter(log => {
-        if (type === 'otp') return log.type.includes('otp');
-        return log.type === type;
-      });
-      setLogs(filtered);
-    }
-  };
-
   return (
     <>
       <Head>
@@ -332,23 +237,12 @@ export default function Dashboard() {
           .result { padding: 12px 16px; border-radius: 8px; font-weight: 500; margin-top: 15px; }
           .result.success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
           .result.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-          .status { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
-          .status.good { background: #f0fdf4; color: #16a34a; }
-          .status.bad { background: #fef2f2; color: #dc2626; }
-          .status.warning { background: #fef3c7; color: #d97706; }
           table { width: 100%; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; border-collapse: collapse; }
           th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
           th { background: #f8f9fa; font-weight: 600; font-size: 0.85rem; color: #333; }
           .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
           .badge.success { background: #f0fdf4; color: #16a34a; }
           .badge.error { background: #fef2f2; color: #dc2626; }
-          .btn-icon { background: none; border: none; cursor: pointer; padding: 5px; color: #666; transition: color 0.2s; }
-          .btn-icon:hover { color: #4361ee; }
-          .activity-item { display: flex; align-items: center; gap: 15px; padding: 12px; border-bottom: 1px solid #f0f0f0; }
-          .activity-icon { width: 40px; height: 40px; background: #f0f4ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #4361ee; }
-          .activity-info p { margin: 0; font-size: 0.9rem; }
-          .activity-info small { color: #888; font-size: 0.8rem; }
-          .empty-state { text-align: center; padding: 40px; color: #888; }
           #step1, #step2 { background: #f8fafc; padding: 25px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
           #step2 { background: #f0fdf4; border-color: #bbf7d0; }
           #otp-code-field { margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%); border-radius: 8px; border-left: 4px solid #4361ee; animation: slideIn 0.3s ease-out; }
@@ -407,14 +301,23 @@ export default function Dashboard() {
                   {connectionStatus === 'online' ? 'Online' : 'Offline'}
                 </span>
               </span>
-              <button onClick={refreshCurrentSection} style={{ padding: '8px 16px' }} className="btn-secondary">
+              <button onClick={() => {
+                if (currentSection === 'overview') loadOverview();
+                else if (currentSection === 'users') {
+                  // load users
+                } else if (currentSection === 'otps') {
+                  // load otps  
+                } else if (currentSection === 'logs') {
+                  // load logs
+                }
+              }} style={{ padding: '8px 16px' }} className="btn-secondary">
                 <i className="fas fa-sync-alt"></i> Atualizar
               </button>
             </div>
           </div>
 
           {/* Visão Geral */}
-          <div className={`section-content ${currentSection === 'overview' ? '' : 'hidden'}`} id="overview-section">
+          <div className={`section-content ${currentSection === 'overview' ? '' : 'hidden'}`}>
             <div className="stats-grid">
               <div className="stat-card">
                 <h3>Usuários</h3>
@@ -440,17 +343,19 @@ export default function Dashboard() {
 
             <div className="card">
               <h2><i className="fas fa-activity"></i> Atividade Recente</h2>
-              <div id="recent-activity">
+              <div>
                 {otps.slice(0, 5).map((otp, idx) => (
-                  <div className="activity-item" key={idx}>
-                    <span className="activity-icon"><i className="fas fa-mobile-alt"></i></span>
-                    <div className="activity-info">
-                      <p><strong>OTP {otp.verified ? 'verificado' : 'gerado'}</strong> para {otp.phone || otp.email}</p>
-                      <small>{new Date(otp.created_at).toLocaleString('pt-BR')}</small>
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
+                    <span style={{ width: '40px', height: '40px', background: '#f0f4ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4361ee' }}>
+                      <i className="fas fa-mobile-alt"></i>
+                    </span>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>OTP {otp.verified ? 'verificado' : 'gerado'}</strong> para {otp.phone || otp.email}</p>
+                      <small style={{ color: '#888', fontSize: '0.8rem' }}>{new Date(otp.created_at).toLocaleString('pt-BR')}</small>
                     </div>
                   </div>
                 ))}
-                {otps.length === 0 && <p className="empty-state">Nenhuma atividade recente</p>}
+                {otps.length === 0 && <p style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Nenhuma atividade recente</p>}
               </div>
             </div>
 
@@ -459,101 +364,26 @@ export default function Dashboard() {
               <div style={{ display: 'grid', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <span style={{ color: '#888', fontSize: '0.85rem' }}>Supabase</span>
-                  <span id="supabase-status" className={`status ${supabaseStatus === 'Conectado' ? 'good' : 'bad'}`}>{supabaseStatus}</span>
+                  <span className={`badge ${supabaseStatus === 'Conectado' ? 'success' : 'error'}`}>{supabaseStatus}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <span style={{ color: '#888', fontSize: '0.85rem' }}>API Backend</span>
-                  <span className="status good">Online</span>
+                  <span className="badge success">Online</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
                   <span style={{ color: '#888', fontSize: '0.85rem' }}>WebSocket</span>
-                  <span id="websocket-status" className={`status ${websocketStatus === 'Conectado' ? 'good' : 'bad'}`}>{websocketStatus}</span>
+                  <span className={`badge ${websocketStatus === 'Conectado' ? 'success' : 'error'}`}>{websocketStatus}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '0.85rem', color: '#888' }}>
                   <span>Última Verificação</span>
-                  <span id="last-check">{lastCheck}</span>
+                  <span>{lastCheck}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Usuários */}
-          <div className={`section-content ${currentSection === 'users' ? '' : 'hidden'}`} id="users-section">
-            <div className="card">
-              <h2><i className="fas fa-users"></i> Usuários ({users.length})</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>Email</th>
-                    <th>Telefone</th>
-                    <th>Criado em</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody id="users-body">
-                  {users.map((user, idx) => (
-                    <tr key={idx}>
-                      <td>{user.nome} {user.sobrenome || ''}</td>
-                      <td>{user.email || '-'}</td>
-                      <td>{user.telefone || '-'}</td>
-                      <td>{new Date(user.criado_em).toLocaleString('pt-BR')}</td>
-                      <td><span className={`badge ${user.ativo ? 'success' : 'error'}`}>{user.ativo ? 'Ativo' : 'Inativo'}</span></td>
-                      <td>
-                        <button className="btn-icon" onClick={() => viewUser(user.telefone || user.email)} title="Ver detalhes"><i className="fas fa-eye"></i></button>
-                        <button className="btn-icon" onClick={() => resetUserPassword(user.telefone || user.email)} title="Redefinir senha"><i className="fas fa-key"></i></button>
-                      </td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && <tr><td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Nenhum usuário encontrado</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* OTPs */}
-          <div className={`section-content ${currentSection === 'otps' ? '' : 'hidden'}`} id="otps-section">
-            <div className="card">
-              <h2><i className="fas fa-mobile-alt"></i> OTPs ({otps.length})</h2>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Telefone/Email</th>
-                    <th>Código</th>
-                    <th>Status</th>
-                    <th>Expira em</th>
-                    <th>Tentativas</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody id="otps-body">
-                  {otps.map((otp, idx) => {
-                    const now = new Date();
-                    const expiresAt = new Date(otp.expires_at);
-                    const isExpired = expiresAt < now;
-                    const status = otp.verified ? 'verified' : (isExpired ? 'expired' : 'pending');
-                    const statusText = otp.verified ? 'Verificado' : (isExpired ? 'Expirado' : 'Pendente');
-                    
-                    return (
-                      <tr key={idx}>
-                        <td>{otp.phone || otp.email}</td>
-                        <td><strong>{otp.code}</strong></td>
-                        <td style={{ color: otp.verified ? '#16a34a' : isExpired ? '#dc2626' : '#d97706' }}>{statusText}</td>
-                        <td>{expiresAt.toLocaleString('pt-BR')}</td>
-                        <td>{otp.attempts || 0}</td>
-                        <td><button className="btn-icon" onClick={() => deleteOTP(otp.id)} title="Excluir"><i className="fas fa-trash"></i></button></td>
-                      </tr>
-                    );
-                  })}
-                  {otps.length === 0 && <tr><td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Nenhum OTP encontrado</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
           {/* Redefinir Senha */}
-          <div className={`section-content ${currentSection === 'password-reset' ? '' : 'hidden'}`} id="password-reset-section">
+          <div className={`section-content ${currentSection === 'password-reset' ? '' : 'hidden'}`}>
             <div className="card">
               <h2><i className="fas fa-key"></i> Redefinir Senha</h2>
               <p style={{ color: '#666', marginBottom: '20px', fontSize: '0.9rem' }}>Passo 1: Envie o código OTP. Passo 2: Redefina a senha.</p>
@@ -605,7 +435,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div id="reset-result" className={`result ${resetResult.type === 'success' ? 'success' : 'error'}`} style={{ display: resetResult.message ? 'block' : 'none' }}>
+                <div className={`result ${resetResult.type === 'success' ? 'success' : 'error'}`} style={{ display: resetResult.message ? 'block' : 'none' }}>
                   {resetResult.message}
                 </div>
                 
@@ -644,7 +474,7 @@ export default function Dashboard() {
                     />
                   </div>
                   
-                  <div id="reset-password-result" className={`result ${resetResult.type === 'success' ? 'success' : 'error'}`} style={{ display: resetResult.message ? 'block' : 'none' }}>
+                  <div className={`result ${resetResult.type === 'success' ? 'success' : 'error'}`} style={{ display: resetResult.message ? 'block' : 'none' }}>
                     {resetResult.message}
                   </div>
                   
@@ -653,66 +483,6 @@ export default function Dashboard() {
                   </button>
                 </div>
               )}
-            </div>
-            
-            <div className="card">
-              <h2><i className="fas fa-info-circle"></i> Lógica de Redefinição</h2>
-              <div style={{ padding: '15px', background: '#f8fafc', borderRadius: '8px' }}>
-                <h3 style={{ marginBottom: '10px' }}>Como funciona:</h3>
-                <ol style={{ paddingLeft: '20px', fontSize: '0.9rem', lineHeight: '1.8' }}>
-                  <li>Digite telefone/email e escolha o método</li>
-                  <li>Clique em "Enviar Código" - o código será enviado</li>
-                  <li>Digite o código recebido e clique "Validar Código"</li>
-                  <li>Após validação, digite a nova senha no Passo 2</li>
-                  <li>Clique em "Redefinir Senha" para concluir</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-
-          {/* Logs */}
-          <div className={`section-content ${currentSection === 'logs' ? '' : 'hidden'}`} id="logs-section">
-            <div className="card">
-              <h2><i className="fas fa-list"></i> Logs do Sistema</h2>
-              <div style={{ marginBottom: '15px' }}>
-                {['all', 'otp', 'user', 'email'].map((type) => (
-                  <button 
-                    key={type}
-                    onClick={() => filterLogs(type)}
-                    className="btn-secondary" 
-                    style={{ marginRight: '10px', marginBottom: '5px', padding: '8px 16px', fontSize: '0.85rem' }}
-                  >
-                    {type === 'all' ? 'Todos' : type === 'otp' ? 'OTPs' : type === 'user' ? 'Usuários' : 'Emails'}
-                  </button>
-                ))}
-              </div>
-              <div id="logs-list">
-                {logs.map((log, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '15px', 
-                    padding: '12px', 
-                    borderBottom: '1px solid #f0f0f0' 
-                  }}>
-                    <span style={{ 
-                      width: '40px', 
-                      height: '40px', 
-                      background: '#f0f4ff', 
-                      borderRadius: '8px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      color: '#4361ee' 
-                    }}>
-                      <i className={log.icon}></i>
-                    </span>
-                    <div style={{ margin: 0, fontSize: '0.9rem' }}>{log.message}</div>
-                    <small style={{ color: '#888', fontSize: '0.8rem' }}>{new Date(log.time).toLocaleString('pt-BR')}</small>
-                  </div>
-                ))}
-                {logs.length === 0 && <p className="empty-state">Nenhum log encontrado</p>}
-              </div>
             </div>
           </div>
         </main>
