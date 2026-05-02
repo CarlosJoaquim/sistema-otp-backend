@@ -28,7 +28,7 @@ export default function Dashboard() {
   const [resetResult, setResetResult] = useState({ message: '', type: '' });
   const [showStep2, setShowStep2] = useState(false);
   
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://sistema-otp-backend.vercel.app';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
   const AUTH = typeof window !== 'undefined' ? 'Basic ' + btoa((process.env.NEXT_PUBLIC_ADMIN_USER || 'admin') + ':' + (process.env.NEXT_PUBLIC_ADMIN_PASS || 'admin123')) : '';
 
   useEffect(() => {
@@ -40,7 +40,9 @@ export default function Dashboard() {
 
   const checkConnection = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/status`);
+      // Se API_BASE estiver vazio, usa a mesma origem
+      const base = API_BASE || window.location.origin;
+      const response = await fetch(`${base}/api/status`);
       const data = await response.json();
       
       if (data.supabase === 'connected') {
@@ -59,8 +61,9 @@ export default function Dashboard() {
 
   const loadOverview = async () => {
     try {
+      const base = API_BASE || window.location.origin;
       const [usersRes, otpsRes, logsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/users`),
+        fetch(`${base}/api/users`),
         fetch(`${API_BASE}/api/otps`),
         fetch(`${API_BASE}/api/logs`)
       ]);
