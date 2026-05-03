@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY || '');
 
-export type EmailType = 'signup' | 'password_reset';
+export type EmailType = 'signup' | 'password_reset' | 'reservation_notification';
 
 export interface EmailResult {
   success: boolean;
@@ -141,6 +141,98 @@ Se você não solicitou a redefinição de senha, ignore este email e sua conta 
 © ${new Date().getFullYear()} CAOP-B
 `;
 
+const getReservationEmailHTML = (
+  agentName: string,
+  establishmentName: string,
+  customerName: string,
+  date: string,
+  time: string,
+  numPessoas: number,
+  tipo: string,
+  observacoes?: string
+) => `
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 40px auto; background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;">
+    <div style="padding: 40px;">
+      ${EmailHeader}
+      <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 28px; border: 1px solid #a7f3d0;">
+        <div style="font-size: 32px; margin-bottom: 4px;">📋</div>
+        <h2 style="font-size: 18px; font-weight: 600; color: #065f46; margin: 0;">Nova Reserva Recebida!</h2>
+      </div>
+      <h1 style="font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 8px 0;">Olá, ${agentName}!</h1>
+      <p style="font-size: 14px; color: #6b7280; margin: 0 0 24px 0;">Você tem uma nova reserva no seu estabelecimento <strong>${establishmentName}</strong>.</p>
+      <div style="background: #f9fafb; border-radius: 10px; padding: 20px; margin-bottom: 24px; border: 1px solid #e5e7eb;">
+        <div style="display: grid; gap: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; color: #6b7280;">👤 Cliente</span>
+            <span style="font-size: 14px; font-weight: 500; color: #111827;">${customerName}</span>
+          </div>
+          <div style="border-top: 1px solid #e5e7eb;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; color: #6b7280;">📅 Data</span>
+            <span style="font-size: 14px; font-weight: 500; color: #111827;">${date}</span>
+          </div>
+          <div style="border-top: 1px solid #e5e7eb;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; color: #6b7280;">🕐 Horário</span>
+            <span style="font-size: 14px; font-weight: 500; color: #111827;">${time}</span>
+          </div>
+          <div style="border-top: 1px solid #e5e7eb;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; color: #6b7280;">👥 Pessoas</span>
+            <span style="font-size: 14px; font-weight: 500; color: #111827;">${numPessoas}</span>
+          </div>
+          <div style="border-top: 1px solid #e5e7eb;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 13px; color: #6b7280;">📍 Tipo</span>
+            <span style="font-size: 14px; font-weight: 500; color: #111827; text-transform: capitalize;">${tipo}</span>
+          </div>
+          ${observacoes ? `
+          <div style="border-top: 1px solid #e5e7eb;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <span style="font-size: 13px; color: #6b7280;">📝 Observações</span>
+            <span style="font-size: 14px; color: #374151; max-width: 60%; text-align: right;">${observacoes}</span>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+      <div style="background: #eff6ff; border-radius: 8px; padding: 14px; margin-bottom: 24px; border-left: 3px solid #3b82f6;">
+        <p style="font-size: 13px; color: #1e40af; margin: 0;">💡 Acesse o painel para aceitar ou recusar esta reserva.</p>
+      </div>
+      <p style="font-size: 14px; color: #6b7280;">Se você não reconhece esta reserva, entre em contato com o suporte.</p>
+    </div>
+    ${EmailFooter}
+  </div>
+`;
+
+const getReservationEmailText = (
+  agentName: string,
+  establishmentName: string,
+  customerName: string,
+  date: string,
+  time: string,
+  numPessoas: number,
+  tipo: string,
+  observacoes?: string
+) => `
+Olá, ${agentName}!
+
+Você tem uma nova reserva no seu estabelecimento ${establishmentName}.
+
+Detalhes da reserva:
+- Cliente: ${customerName}
+- Data: ${date}
+- Horário: ${time}
+- Número de pessoas: ${numPessoas}
+- Tipo: ${tipo}
+${observacoes ? `- Observações: ${observacoes}` : ''}
+
+Acesse o painel para aceitar ou recusar esta reserva.
+
+Se você não reconhece esta reserva, entre em contato com o suporte.
+
+© ${new Date().getFullYear()} CAOP-B
+`;
+
 export const sendVerificationEmail = async (
   to: string,
   code: string,
@@ -172,6 +264,52 @@ export const sendVerificationEmail = async (
 
 export const sendOTPEmail = async (to: string, code: string, name?: string): Promise<EmailResult> => {
   return sendVerificationEmail(to, code, 'signup', name);
+};
+
+export interface ReservationNotificationParams {
+  agentEmail: string;
+  agentName: string;
+  establishmentName: string;
+  customerName: string;
+  date: string;
+  time: string;
+  numPessoas: number;
+  tipo: string;
+  observacoes?: string;
+}
+
+export const sendReservationNotificationEmail = async (
+  params: ReservationNotificationParams
+): Promise<EmailResult> => {
+  const html = getReservationEmailHTML(
+    params.agentName,
+    params.establishmentName,
+    params.customerName,
+    params.date,
+    params.time,
+    params.numPessoas,
+    params.tipo,
+    params.observacoes
+  );
+
+  const text = getReservationEmailText(
+    params.agentName,
+    params.establishmentName,
+    params.customerName,
+    params.date,
+    params.time,
+    params.numPessoas,
+    params.tipo,
+    params.observacoes
+  );
+
+  return sendWithRetry({
+    from: process.env.EMAIL_FROM || 'CAOP-B <team@caop-b.com>',
+    to: [params.agentEmail],
+    subject: `📋 Nova Reserva - ${params.establishmentName}`,
+    html,
+    text,
+  });
 };
 
 export default resend;

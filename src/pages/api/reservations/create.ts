@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import supabase from '../../../lib/supabase';
 import { logEvent, generateCorrelationId } from '../../../lib/logger';
 import { checkUserRateLimit } from '../../../lib/rateLimit';
+import { sendReservationNotificationEmail } from '../../../lib/mailer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -32,6 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const date = new Date(data_hora);
+    const dateStr = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
     const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 
     const { data: existing } = await supabase
@@ -66,6 +68,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (error) throw error;
 
+    const agentId = lugar.usuario_id;
+
+    const { data: agent } = await supabase
+      .from('usuarios')
+      .select('email, nome')
+      .eq('id', agentId)
+      .single();
+
+    const { data: customer } = await supabase
+      .from('usuarios')
+      .select('nome, email')
+      .eq('id', usuario_id)
+      .single();
+
+    if (agent?.email) {
+      const emailResult = await sendReservationNotificationEmail({
+        agentEmail: agent.email,
+        agentName: agent.nome || 'Agente',
+        establishmentName: lugar.nome,
+        customerName: customer?.nome || 'Cliente',
+        date: dateStr,
+        time: timeStr,
+        numPessoas: num_pessoas,
+        tipo: tipo || 'presencial',
+        observacoes: observacoes || undefined,
+      });
+
+      if (!emailResult.success) {
+        console.error('Falha ao enviar email de notificação:', emailResult.error);
+      }
+    }
+
+    await supabase
+      .from('notificacoes')
+      .insert([{
+        usuario_id: agentId,
+        titulo: 'Nova Reserva Recebida',
+        mensagem: `Você tem uma nova reserva de ${customer?.nome || 'um cliente'} para ${dateStr} às ${timeStr}.`,
+        tipo: 'reserva',
+        dados: {
+          reservation_id: insertedReservation.id,
+          establishment_name: lugar.nome,
+          customer_name: customer?.nome || 'Cliente',
+          date: dateStr,
+          time: timeStr,
+          num_pessoas: num_pessoas,
+          tipo: tipo || 'presencial',
+          observacoes: observacoes || null,
+        },
+        lida: false,
+        criado_em: new Date().toISOString(),
+      }]);
+
+    await supabase
+      .from('suporte_mensagens')
+      .insert([{
+        usuario_id: agentId,
+        mensagem: `📋 Nova reserva: ${customer?.nome || 'Cliente'} reservou ${lugar.nome} para ${dateStr} às ${timeStr} (${num_pessoas} pessoa${num_pessoas > 1 ? 's' : ''}).${observacoes ? ` Obs: ${observacoes}` : ''}`,
+        tipo: 'reserva',
+        criado_em: new Date().toISOString(),
+      }]);
+
     await logEvent({
       correlation_id: correlationId,
       event_type: 'reservation_created',
@@ -73,16 +137,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         reservation_id: insertedReservation.id,
         lugar_id,
-        agent_id: lugar.usuario_id,
+        agent_id: agentId,
         time: timeStr,
         guests: num_pessoas,
+        email_sent: !!agent?.email,
       }
     });
 
     return res.status(201).json({
       success: true,
       data: insertedReservation,
-      agent_id: lugar.usuario_id,
+      agent_id: agentId,
       establishment_name: lugar.nome,
     });
   } catch (error: any) {
