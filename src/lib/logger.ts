@@ -13,7 +13,12 @@ export type EventType =
   | 'rate_limit_exceeded'
   | 'blocked_user_attempt'
   | 'login_success'
-  | 'login_failed';
+  | 'login_failed'
+  | 'reservation_created'
+  | 'reservation_cancelled'
+  | 'reservation_failed'
+  | 'reservation_listed'
+  | 'establishment_searched';
 
 export type EventStatus = 'success' | 'failure' | 'rate_limited' | 'blocked';
 
