@@ -38,8 +38,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: existingUser } = await supabase
       .from('usuarios')
       .select('email, telefone')
-      .or(`email.eq.${email},telefone.eq.${telefone || ''}`)
-      .single();
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
 
     if (existingUser) {
       await logEvent({
@@ -53,23 +53,72 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ success: false, message: 'Usuário já cadastrado' });
     }
 
-    // Criar usuário no Supabase Auth (email não confirmado)
+    // Criar usuário no Supabase Auth primeiro
     const userId = uuidv4();
+
+    const supabaseUrl = process.env.SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_KEY!;
+
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        id: userId,
+        email: email.toLowerCase().trim(),
+        password: senha,
+        email_confirm: true,
+        user_metadata: {
+          nome,
+          sobrenome: sobrenome || '',
+        },
+      }),
+    });
+
+    if (!authResponse.ok) {
+      const authError = await authResponse.json();
+      if (authError.msg?.includes('already been registered') || authError.message?.includes('already')) {
+        return res.status(400).json({ success: false, message: 'Usuário já cadastrado' });
+      }
+      throw new Error(`Erro ao criar auth: ${JSON.stringify(authError)}`);
+    }
+
+    // Hash da senha para a tabela usuarios (compatibilidade com login direto)
     const passwordHash = await bcrypt.hash(senha, 10);
 
+    // Criar registro na tabela usuarios
     const { error: userError } = await supabase
       .from('usuarios')
       .insert([{
         id: userId,
         nome,
         sobrenome: sobrenome || '',
-        email,
+        email: email.toLowerCase().trim(),
         telefone: telefone || null,
         senha: passwordHash,
+        papel: 'USUARIO',
+        ativo: true,
         criado_em: new Date().toISOString(),
       }]);
 
-    if (userError) throw userError;
+    if (userError) {
+      // Se falhou na tabela usuarios, tenta limpar o auth
+      try {
+        await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+        });
+      } catch {
+        // Ignora erro na limpeza
+      }
+      throw userError;
+    }
 
     // Criar OTP com hash (20 min para cadastro)
     const otpResult = await createOTP(email, false, 'email', correlationId);

@@ -58,6 +58,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ success: false, message: 'Email ou senha incorretos' });
     }
 
+    // Criar utilizador no Supabase Auth se não existir (para RLS funcionar)
+    const supabaseUrl = process.env.SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_KEY!;
+
+    try {
+      const authCheck = await fetch(`${supabaseUrl}/auth/v1/admin/users/${usuario.id}`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      });
+
+      if (!authCheck.ok) {
+        // Utilizador não existe no Auth, criar
+        await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            id: usuario.id,
+            email: usuario.email,
+            password: senha,
+            email_confirm: true,
+            user_metadata: {
+              nome: usuario.nome,
+              sobrenome: usuario.sobrenome,
+            },
+          }),
+        });
+      }
+    } catch (authError) {
+      console.warn('Não foi possível criar/sync com Supabase Auth:', authError);
+    }
+
     await logEvent({
       correlation_id: correlationId,
       event_type: 'login_success',
