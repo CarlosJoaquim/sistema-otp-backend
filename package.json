@@ -1,7 +1,7 @@
 {
   "name": "sistema-otp-backend",
   "version": "1.0.0",
-  "description": "OTP System - Next.js Monolith with TypeScript",
+  "description": "OTP System - Next.js Monolith (Pure JavaScript)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,18 +9,21 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
+    "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.3",
+    "ioredis": "^5.10.1",
     "next": "^14.2.35",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "redis": "^5.12.1",
+    "resend": "^6.12.2",
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
+    "@types/react": "19.2.14",
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.12",
     "tailwindcss": "^3.4.19",
-    "typescript": "^5.0.0"
+    "typescript": "6.0.3"
   }
 }

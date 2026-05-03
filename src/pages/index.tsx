@@ -1,24 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
+import Sidebar from '../components/Sidebar';
+import Overview from '../components/Overview';
+import UsersTable from '../components/UsersTable';
+import OTPsTable from '../components/OTPsTable';
+import PasswordReset from '../components/PasswordReset';
+import Logs from '../components/Logs';
+import AdminMetrics from '../components/AdminMetrics';
+import Register from '../components/Register';
 
 export default function Dashboard() {
   const [currentSection, setCurrentSection] = useState('overview');
-  const [users, setUsers] = useState([]);
-  const [otps, setOtps] = useState([]);
-  const [logs, setLogs] = useState([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [otps, setOtps] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalOtps: 0,
-    verifiedOtps: 0
+    verifiedOtps: 0,
+    expiredOtps: 0,
+    pendingOtps: 0,
+    failedOtps: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-  
-  useEffect(() => {
-    loadOverview();
-  }, []);
 
-  const loadOverview = async () => {
+  const loadOverview = useCallback(async () => {
     try {
       const base = API_BASE || window.location.origin;
       const [usersRes, otpsRes] = await Promise.all([
@@ -29,104 +38,142 @@ export default function Dashboard() {
       const usersData = await usersRes.json();
       const otpsData = await otpsRes.json();
       
-      setUsers(usersData.data || []);
-      setOtps(otpsData.data || []);
+      const usersList = usersData.data || [];
+      const otpsList = otpsData.data || [];
+      
+      const now = new Date();
+      const expiredCount = otpsList.filter((o: any) => 
+        !o.verified && o.expires_at && new Date(o.expires_at) < now
+      ).length;
+      const pendingCount = otpsList.filter((o: any) => 
+        !o.verified && o.expires_at && new Date(o.expires_at) >= now && (!o.attempts || o.attempts < 3)
+      ).length;
+      const failedCount = otpsList.filter((o: any) => 
+        o.attempts && o.attempts >= 3
+      ).length;
+      
+      setUsers(usersList);
+      setOtps(otpsList);
       setStats({
-        totalUsers: (usersData.data || []).length,
-        totalOtps: (otpsData.data || []).length,
-        verifiedOtps: (otpsData.data || []).filter((o: any) => o.verified).length
+        totalUsers: usersList.length,
+        totalOtps: otpsList.length,
+        verifiedOtps: otpsList.filter((o: any) => o.verified).length,
+        expiredOtps: expiredCount,
+        pendingOtps: pendingCount,
+        failedOtps: failedCount,
       });
+      setLastRefresh(new Date());
     } catch (error) {
-      console.error(error);
+      console.error('Erro ao carregar dados:', error);
+    }
+    setLoading(false);
+  }, [API_BASE]);
+
+  useEffect(() => {
+    loadOverview();
+  }, [loadOverview]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const interval = setInterval(() => {
+      loadOverview();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadOverview]);
+
+  const renderSection = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-3">
+            <i className="fas fa-spinner fa-spin text-3xl text-gray-300"></i>
+            <p className="text-sm text-gray-500">Carregando...</p>
+          </div>
+        </div>
+      );
+    }
+
+    switch (currentSection) {
+      case 'overview':
+        return <Overview stats={stats} />;
+      case 'register':
+        return <Register />;
+      case 'users':
+        return <UsersTable users={users} />;
+      case 'otps':
+        return <OTPsTable otps={otps} />;
+      case 'password-reset':
+        return <PasswordReset />;
+      case 'logs':
+        return <Logs />;
+      case 'admin-metrics':
+        return <AdminMetrics />;
+      default:
+        return <Overview stats={stats} />;
     }
   };
 
   return (
     <>
       <Head>
-        <title>OTP CAOP-B</title>
+        <title>OTP CAOP-B | Dashboard</title>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
       </Head>
       
-      <div style={{ display: 'flex', minHeight: '100vh' }}>
-        <aside style={{ width: '240px', background: 'white', padding: '20px' }}>
-          <h2>OTP CAOP-B</h2>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {['overview', 'users', 'otps', 'password-reset', 'logs'].map(section => (
-              <li 
-                key={section}
-                onClick={() => setCurrentSection(section)}
-                style={{ padding: '12px 16px', cursor: 'pointer', background: currentSection === section ? '#4361ee' : 'transparent', color: currentSection === section ? 'white' : '#666', borderRadius: '8px', margin: '4px 0' }}
-              >
-                {section === 'overview' ? 'Visão Geral' : 
-                 section === 'users' ? 'Usuários' :
-                 section === 'otps' ? 'OTPs' :
-                 section === 'password-reset' ? 'Redefinir Senha' : 'Logs'}
-              </li>
-            ))}
-          </ul>
-        </aside>
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar currentSection={currentSection} onSectionChange={setCurrentSection} />
 
-        <main style={{ marginLeft: '240px', padding: '20px', flex: 1 }}>
-          <h1>
-            {currentSection === 'overview' ? 'Visão Geral' :
-             currentSection === 'users' ? 'Usuários' :
-             currentSection === 'otps' ? 'OTPs' :
-             currentSection === 'password-reset' ? 'Redefinir Senha' : 'Logs'}
-          </h1>
-          
-          {currentSection === 'overview' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-              <div style={{ background: 'white', padding: '20px', borderRadius: '10px' }}>
-                <h3>Usuários</h3>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.totalUsers}</div>
-              </div>
-              <div style={{ background: 'white', padding: '20px', borderRadius: '10px' }}>
-                <h3>OTPs Gerados</h3>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.totalOtps}</div>
-              </div>
-              <div style={{ background: 'white', padding: '20px', borderRadius: '10px' }}>
-                <h3>OTPs Verificados</h3>
-                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.verifiedOtps}</div>
-              </div>
+        <main className="ml-64">
+          <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+            <div className="flex items-center gap-4">
+              <h2 className="text-lg font-semibold text-gray-900 capitalize">
+                {currentSection === 'overview' && 'Visão Geral'}
+                {currentSection === 'admin-metrics' && 'Métricas Avançadas'}
+                {currentSection === 'register' && 'Criar Conta'}
+                {currentSection === 'users' && 'Usuários'}
+                {currentSection === 'otps' && 'OTPs'}
+                {currentSection === 'password-reset' && 'Redefinir Senha'}
+                {currentSection === 'logs' && 'Logs'}
+              </h2>
             </div>
-          )}
-          
-          {currentSection === 'users' && (
-            <table style={{ width: '100%', background: 'white', borderRadius: '10px', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr><th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Nome</th><th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Email</th><th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Telefone</th></tr>
-              </thead>
-              <tbody>
-                {users.map((user: any, idx: number) => (
-                  <tr key={idx}>
-                    <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>{user.nome} {user.sobrenome || ''}</td>
-                    <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>{user.email || '-'}</td>
-                    <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>{user.telefone || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          
-          {currentSection === 'otps' && (
-            <table style={{ width: '100%', background: 'white', borderRadius: '10px', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr><th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Telefone</th><th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Código</th><th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #eee' }}>Status</th></tr>
-              </thead>
-              <tbody>
-                {otps.map((otp: any, idx: number) => (
-                  <tr key={idx}>
-                    <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}>{otp.phone || otp.email}</td>
-                    <td style={{ padding: '12px', borderBottom: '1px solid #eee' }}><strong>{otp.code}</strong></td>
-                    <td style={{ padding: '12px', borderBottom: '1px solid #eee', color: otp.verified ? '#16a34a' : '#dc2626' }}>{otp.verified ? 'Verificado' : 'Pendente'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+            <div className="flex items-center gap-4">
+              {currentSection !== 'register' && (
+                <>
+                  {lastRefresh && (
+                    <span className="text-xs text-gray-500">
+                      <i className="fas fa-clock mr-1"></i>
+                      Atualizado às {lastRefresh.toLocaleTimeString('pt-BR')}
+                    </span>
+                  )}
+                  <button
+                    onClick={loadOverview}
+                    className="btn-secondary flex items-center gap-2"
+                  >
+                    <i className="fas fa-arrows-rotate text-xs"></i>
+                    Atualizar
+                  </button>
+                  <button
+                    onClick={() => setAutoRefresh(!autoRefresh)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      autoRefresh 
+                        ? 'bg-green-100 text-green-700 border border-green-200' 
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    }`}
+                  >
+                    <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    Auto: {autoRefresh ? 'On' : 'Off'}
+                  </button>
+                </>
+              )}
+            </div>
+          </header>
+
+          <div className="p-8">
+            {renderSection()}
+          </div>
         </main>
       </div>
     </>

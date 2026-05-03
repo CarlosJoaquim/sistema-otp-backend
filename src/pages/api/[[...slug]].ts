@@ -67,7 +67,7 @@ const handler: NextApiHandler = async (req, res) => {
         otps.forEach((otp: any) => {
           logs.push({
             type: 'otp',
-            message: `OTP ${otp.verified ? 'verificado' : 'gerado'}: ${otp.code} para ${otp.phone || otp.email}`,
+            message: `OTP ${otp.verified ? 'verificado' : 'gerado'} para ${otp.phone || otp.email}`,
             time: new Date(otp.created_at),
             icon: 'fas fa-mobile-alt'
           });
