@@ -17,8 +17,6 @@ const Register: FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-
   const showMessage = (msg: string, type: 'success' | 'error') => {
     setMessage(msg);
     setMessageType(type);
@@ -50,8 +48,7 @@ const Register: FC = () => {
     if (!validateForm()) return;
     setLoading(true);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/auth/register`, {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,8 +76,7 @@ const Register: FC = () => {
     if (!otp || otp.length !== 6) return;
     setLoading(true);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/auth/verify-email`, {
+      const res = await fetch('/api/auth/verify-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, code: otp }),
@@ -101,8 +97,7 @@ const Register: FC = () => {
   const handleResendOTP = async () => {
     setLoading(true);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/auth/register`, {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

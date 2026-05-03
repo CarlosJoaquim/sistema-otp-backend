@@ -5,6 +5,8 @@ interface SidebarProps {
   onSectionChange: (section: string) => void;
 }
 
+const LOGO_URL = 'https://caop-b.com/assets/Caop-B-Logo-PNG.png';
+
 const sections = [
   { id: 'overview', label: 'Visão Geral', icon: 'fas fa-chart-line' },
   { id: 'admin-metrics', label: 'Métricas', icon: 'fas fa-gauge-high' },
@@ -25,14 +27,13 @@ const Sidebar: FC<SidebarProps> = ({ currentSection, onSectionChange }) => {
   return (
     <aside className="w-64 bg-gray-900 text-white min-h-screen fixed left-0 top-0 bottom-0 flex flex-col">
       <div className="p-6 border-b border-gray-800">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-            <i className="fas fa-shield-halved text-lg"></i>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold tracking-tight">OTP CAOP-B</h2>
-            <p className="text-xs text-gray-400">Sistema de Autenticação</p>
-          </div>
+        <div className="flex flex-col items-center text-center">
+          <img
+            src={LOGO_URL}
+            alt="CAOP-B"
+            className="h-14 w-auto mb-3 drop-shadow-lg"
+          />
+          <h2 className="text-sm font-semibold tracking-wide text-white/90 uppercase">Painel Administrativo</h2>
         </div>
       </div>
 
@@ -82,7 +83,7 @@ const Sidebar: FC<SidebarProps> = ({ currentSection, onSectionChange }) => {
 
       <div className="p-4 border-t border-gray-800">
         <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-xs font-bold">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-xs font-bold text-white">
             A
           </div>
           <div className="flex-1 min-w-0">

@@ -1,4 +1,5 @@
 import { FC, useEffect, useState } from 'react';
+import { apiFetch } from '../lib/api';
 
 interface MetricsData {
   metrics: {
@@ -20,7 +21,6 @@ const AdminMetrics: FC = () => {
   const [period, setPeriod] = useState(24);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
     loadMetrics();
@@ -30,8 +30,7 @@ const AdminMetrics: FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/admin/metrics?period=${period}`);
+      const res = await apiFetch(`/api/admin/metrics?period=${period}`);
       if (!res.ok) {
         if (res.status === 401) {
           setError('Não autorizado. Verifique as credenciais de admin.');

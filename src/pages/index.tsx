@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import Sidebar from '../components/Sidebar';
 import Overview from '../components/Overview';
 import UsersTable from '../components/UsersTable';
@@ -8,8 +9,12 @@ import PasswordReset from '../components/PasswordReset';
 import Logs from '../components/Logs';
 import AdminMetrics from '../components/AdminMetrics';
 import Register from '../components/Register';
+import { getAdminAuth, clearAdminAuth, authHeaders } from '../lib/api';
+
+const LOGO_URL = 'https://caop-b.com/assets/Caop-B-Logo-PNG.png';
 
 export default function Dashboard() {
+  const router = useRouter();
   const [currentSection, setCurrentSection] = useState('overview');
   const [users, setUsers] = useState<any[]>([]);
   const [otps, setOtps] = useState<any[]>([]);
@@ -24,15 +29,29 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
   
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
+  useEffect(() => {
+    const auth = getAdminAuth();
+    if (!auth) {
+      router.replace('/login');
+      return;
+    }
+    setAuthenticated(true);
+  }, [router]);
+
+  const fetchWithAuth = useCallback(async (url: string) => {
+    const base = API_BASE || window.location.origin;
+    return fetch(`${base}${url}`, { headers: authHeaders() });
+  }, [API_BASE]);
+
   const loadOverview = useCallback(async () => {
     try {
-      const base = API_BASE || window.location.origin;
       const [usersRes, otpsRes] = await Promise.all([
-        fetch(`${base}/api/users`),
-        fetch(`${base}/api/otps`)
+        fetchWithAuth('/api/users'),
+        fetchWithAuth('/api/otps')
       ]);
       
       const usersData = await usersRes.json();
@@ -67,28 +86,59 @@ export default function Dashboard() {
       console.error('Erro ao carregar dados:', error);
     }
     setLoading(false);
-  }, [API_BASE]);
+  }, [fetchWithAuth]);
 
   useEffect(() => {
-    loadOverview();
-  }, [loadOverview]);
+    if (authenticated) {
+      loadOverview();
+    }
+  }, [authenticated, loadOverview]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || !authenticated) return;
     
     const interval = setInterval(() => {
       loadOverview();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, loadOverview]);
+  }, [autoRefresh, authenticated, loadOverview]);
+
+  const handleLogout = () => {
+    clearAdminAuth();
+    router.replace('/login');
+  };
+
+  if (!authenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <img src={LOGO_URL} alt="CAOP-B" className="h-16 w-auto animate-pulse" />
+          <p className="text-sm text-gray-500">Verificando acesso...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const sectionLabels: Record<string, string> = {
+    'overview': 'Visão Geral',
+    'admin-metrics': 'Métricas Avançadas',
+    'register': 'Criar Conta',
+    'users': 'Usuários',
+    'otps': 'OTPs',
+    'password-reset': 'Redefinir Senha',
+    'logs': 'Logs',
+    'admin-users': 'Gestão de Usuários',
+    'admin-otps': 'Gestão de OTPs',
+    'cleanup': 'Limpeza',
+  };
 
   const renderSection = () => {
     if (loading) {
       return (
         <div className="flex items-center justify-center h-64">
           <div className="flex flex-col items-center gap-3">
-            <i className="fas fa-spinner fa-spin text-3xl text-gray-300"></i>
+            <img src={LOGO_URL} alt="CAOP-B" className="h-12 w-auto animate-pulse" />
             <p className="text-sm text-gray-500">Carregando...</p>
           </div>
         </div>
@@ -118,7 +168,7 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>OTP CAOP-B | Dashboard</title>
+        <title>Dashboard - CAOP-B</title>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
@@ -127,25 +177,21 @@ export default function Dashboard() {
         <Sidebar currentSection={currentSection} onSectionChange={setCurrentSection} />
 
         <main className="ml-64">
-          <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+          <header className="bg-white border-b border-gray-200 px-8 py-3 flex items-center justify-between sticky top-0 z-10">
             <div className="flex items-center gap-4">
-              <h2 className="text-lg font-semibold text-gray-900 capitalize">
-                {currentSection === 'overview' && 'Visão Geral'}
-                {currentSection === 'admin-metrics' && 'Métricas Avançadas'}
-                {currentSection === 'register' && 'Criar Conta'}
-                {currentSection === 'users' && 'Usuários'}
-                {currentSection === 'otps' && 'OTPs'}
-                {currentSection === 'password-reset' && 'Redefinir Senha'}
-                {currentSection === 'logs' && 'Logs'}
+              <img src={LOGO_URL} alt="CAOP-B" className="h-8 w-auto" />
+              <div className="h-6 w-px bg-gray-200"></div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {sectionLabels[currentSection] || 'Dashboard'}
               </h2>
             </div>
             <div className="flex items-center gap-4">
               {currentSection !== 'register' && (
                 <>
                   {lastRefresh && (
-                    <span className="text-xs text-gray-500">
-                      <i className="fas fa-clock mr-1"></i>
-                      Atualizado às {lastRefresh.toLocaleTimeString('pt-BR')}
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <i className="fas fa-clock"></i>
+                      {lastRefresh.toLocaleTimeString('pt-BR')}
                     </span>
                   )}
                   <button
@@ -168,6 +214,13 @@ export default function Dashboard() {
                   </button>
                 </>
               )}
+              <button
+                onClick={handleLogout}
+                className="btn-secondary flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <i className="fas fa-right-from-bracket text-xs"></i>
+                Sair
+              </button>
             </div>
           </header>
 

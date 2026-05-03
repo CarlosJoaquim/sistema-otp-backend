@@ -10,8 +10,6 @@ const PasswordReset: FC = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-
   const steps = [
     { id: 'request', label: 'Solicitar', icon: 'fas fa-envelope' },
     { id: 'verify', label: 'Verificar', icon: 'fas fa-shield-halved' },
@@ -32,8 +30,7 @@ const PasswordReset: FC = () => {
     setMessage('');
     setMessageType(null);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/auth/request-reset`, {
+      const res = await fetch('/api/auth/request-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -57,8 +54,7 @@ const PasswordReset: FC = () => {
     setMessage('');
     setMessageType(null);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/auth/verify-otp`, {
+      const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: otp }),
@@ -82,8 +78,7 @@ const PasswordReset: FC = () => {
     setMessage('');
     setMessageType(null);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/auth/reset-password`, {
+      const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code: otp, newPassword }),

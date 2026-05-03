@@ -22,27 +22,35 @@
   ::-webkit-scrollbar-thumb {
     @apply bg-gray-300 rounded hover:bg-gray-400;
   }
+
+  ::selection {
+    @apply bg-blue-200 text-blue-900;
+  }
 }
 
 @layer components {
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm p-6;
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow;
+  }
+
+  .card-gradient {
+    @apply bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 shadow-sm p-6;
   }
 
   .btn-primary {
-    @apply px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
-    @apply px-4 py-2.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 active:bg-gray-100 transition-colors;
+    @apply px-4 py-2.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-all;
   }
 
   .input {
-    @apply w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition;
+    @apply w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition;
   }
 
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium gap-1;
   }
 
   .badge-success {
@@ -67,5 +75,44 @@
 
   .badge-gray {
     @apply bg-gray-100 text-gray-800;
+  }
+
+  .stat-card {
+    @apply relative overflow-hidden bg-white rounded-xl border border-gray-200 shadow-sm p-5;
+  }
+
+  .stat-card::before {
+    @apply content-[''] absolute top-0 left-0 w-full h-1;
+  }
+
+  .stat-card-blue::before {
+    @apply bg-gradient-to-r from-blue-500 to-blue-600;
+  }
+
+  .stat-card-purple::before {
+    @apply bg-gradient-to-r from-purple-500 to-purple-600;
+  }
+
+  .stat-card-green::before {
+    @apply bg-gradient-to-r from-green-500 to-green-600;
+  }
+
+  .stat-card-emerald::before {
+    @apply bg-gradient-to-r from-emerald-500 to-emerald-600;
+  }
+
+  .logo-img {
+    @apply drop-shadow-lg transition-transform hover:scale-105;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+  }
+
+  .bg-pattern {
+    background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.03) 1px, transparent 0);
+    background-size: 20px 20px;
   }
 }

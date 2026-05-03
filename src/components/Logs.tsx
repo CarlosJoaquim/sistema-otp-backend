@@ -1,4 +1,5 @@
 import { FC, useEffect, useState } from 'react';
+import { apiFetch } from '../lib/api';
 
 interface Log {
   type: string;
@@ -16,7 +17,6 @@ const Logs: FC = () => {
   const [logs, setLogs] = useState<Log[]>([]);
   const [typeFilter, setTypeFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
     loadLogs();
@@ -25,8 +25,7 @@ const Logs: FC = () => {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const base = API_BASE || window.location.origin;
-      const res = await fetch(`${base}/api/logs`);
+      const res = await apiFetch('/api/logs');
       const data = await res.json();
       setLogs(data.data || []);
     } catch (error) {
