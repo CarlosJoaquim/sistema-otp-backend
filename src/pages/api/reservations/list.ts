@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     let query = supabase
       .from('reservas')
-      .select('*, lugares(nome, categoria, endereco, foto_url)')
+      .select('*, lugares(nome, categoria, endereco, url_imagem)')
       .eq('usuario_id', usuario_id)
       .order('criado_em', { ascending: false });
 
