@@ -11,7 +11,9 @@ export type EventType =
   | 'email_verification_failed'
   | 'user_registered'
   | 'rate_limit_exceeded'
-  | 'blocked_user_attempt';
+  | 'blocked_user_attempt'
+  | 'login_success'
+  | 'login_failed';
 
 export type EventStatus = 'success' | 'failure' | 'rate_limited' | 'blocked';
 
