@@ -96,7 +96,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           status: 'PENDENTE',
           observacoes: observacoes || null,
           tipo: finalTipo,
-          endereco: finalTipo === 'delivery' ? (endereco || null) : null,
           criado_em: new Date().toISOString(),
         }])
         .select('id, usuario_id, lugar_id, data_hora, num_pessoas, status, tipo')
