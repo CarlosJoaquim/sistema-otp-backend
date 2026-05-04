@@ -11,8 +11,8 @@ const createReservationSchema = z.object({
   lugar_id: z.string().uuid('ID do estabelecimento inválido'),
   data_hora: z.string().refine(val => {
     const d = new Date(val);
-    return !isNaN(d.getTime()) && d > new Date();
-  }, 'Data/hora inválida ou no passado'),
+    return !isNaN(d.getTime());
+  }, 'Data/hora inválida'),
   num_pessoas: z.number().int().min(1).max(50, 'Máximo 50 pessoas'),
   categoria: z.string().optional(),
   observacoes: z.string().max(500).optional().nullable(),
@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const rate = await checkUserRateLimit(usuario_id);
       if (!rate.allowed) {
         await logApiRequest({ correlationId, req, startTime }, 'reservation_failed', 'rate_limited', { reason: 'user_rate_limited' });
-        return res.status(429).json({ success: false, message: `Aguarde ${rate.retryAfter}s` });
+        return res.status(429).json({ success: false, message: `Muitas tentativas. Agarde ${rate.retryAfter}s` });
       }
 
       const { result: lugar } = await withTiming(async () => {
@@ -67,7 +67,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const date = new Date(data_hora);
       const dateStr = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-      const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+      const hours = date.getHours();
+      const minutes = date.getUTCMinutes();
+      const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
       const { data: existing } = await supabase
         .from('reservas')
@@ -83,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(409).json({ success: false, message: 'Horário já reservado' });
       }
 
-      const { data: insertedReservation, error } = await supabase
+      const { data: insertedReservation, error: insertError } = await supabase
         .from('reservas')
         .insert([{
           usuario_id,
@@ -100,35 +102,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .select('id, usuario_id, lugar_id, data_hora, num_pessoas, status, tipo')
         .single();
 
-      if (error) throw error;
+      if (insertError) {
+        logger.error('Erro ao inserir reserva', { error: insertError.message, correlationId });
+        return res.status(500).json({ success: false, message: `Erro ao criar reserva: ${insertError.message}` });
+      }
 
       const agentId = lugar.usuario_id;
 
       const [{ data: agent }, { data: customer }] = await Promise.all([
-        supabase.from('usuarios').select('email, nome').eq('id', agentId).single(),
-        supabase.from('usuarios').select('nome, email').eq('id', usuario_id).single(),
+        supabase.from('usuarios').select('email, nome').eq('id', agentId).maybeSingle(),
+        supabase.from('usuarios').select('nome, email').eq('id', usuario_id).maybeSingle(),
       ]);
 
       if (agent?.email) {
-        const emailResult = await sendReservationNotificationEmail({
-          agentEmail: agent.email,
-          agentName: agent.nome || 'Agente',
-          establishmentName: lugar.nome,
-          customerName: customer?.nome || 'Cliente',
-          date: dateStr,
-          time: timeStr,
-          numPessoas: num_pessoas,
-          tipo: finalTipo,
-          observacoes: observacoes || undefined,
-        });
+        try {
+          const emailResult = await sendReservationNotificationEmail({
+            agentEmail: agent.email,
+            agentName: agent.nome || 'Agente',
+            establishmentName: lugar.nome,
+            customerName: customer?.nome || 'Cliente',
+            date: dateStr,
+            time: timeStr,
+            numPessoas: num_pessoas,
+            tipo: finalTipo,
+            observacoes: observacoes || undefined,
+          });
 
-        if (!emailResult.success) {
-          logger.warn('Falha ao enviar email de notificação', { error: emailResult.error });
+          if (!emailResult.success) {
+            logger.warn('Falha ao enviar email de notificação', { error: emailResult.error });
+          }
+        } catch (emailErr) {
+          logger.warn('Erro ao enviar email (não bloqueante)', { correlationId });
         }
       }
 
-      await Promise.all([
-        supabase.from('notificacoes').insert([{
+      try {
+        await supabase.from('notificacoes').insert([{
           usuario_id: agentId,
           titulo: isRestaurante ? 'Nova Reserva Presencial' : 'Nova Reserva Recebida',
           mensagem: `Você tem uma nova reserva ${finalTipo === 'delivery' ? 'para entrega' : 'presencial'} de ${customer?.nome || 'um cliente'} para ${dateStr} às ${timeStr}.`,
@@ -145,14 +154,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
           lida: false,
           criado_em: new Date().toISOString(),
-        }]),
-        supabase.from('suporte_mensagens').insert([{
+        }]);
+      } catch (notifErr) {
+        logger.warn('Erro ao criar notificação (não bloqueante)', { correlationId });
+      }
+
+      try {
+        await supabase.from('suporte_mensagens').insert([{
           usuario_id: agentId,
           mensagem: `📋 Nova reserva ${finalTipo === 'delivery' ? '(entrega)' : '(presencial)'}: ${customer?.nome || 'Cliente'} reservou ${lugar.nome} para ${dateStr} às ${timeStr} (${num_pessoas} pessoa${num_pessoas > 1 ? 's' : ''}).${observacoes ? ` Obs: ${observacoes}` : ''}`,
           tipo: 'reserva',
           criado_em: new Date().toISOString(),
-        }]),
-      ]);
+        }]);
+      } catch (msgErr) {
+        logger.warn('Erro ao criar mensagem de suporte (não bloqueante)', { correlationId });
+      }
 
       await logApiRequest(
         { correlationId, req, startTime },
@@ -172,9 +188,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ success: false, message: error.errors[0]?.message || 'Dados inválidos' });
       }
 
-      logger.error('Erro ao criar reserva', { error: error.message, correlationId });
+      logger.error('Erro ao criar reserva', { error: error.message, correlationId, stack: error.stack });
       await logApiRequest({ correlationId, req, startTime }, 'reservation_failed', 'failure', { error: error.message });
-      return res.status(500).json({ success: false, message: 'Erro interno do servidor' });
+      return res.status(500).json({ success: false, message: `Erro interno do servidor: ${error.message}` });
     }
   });
 }
