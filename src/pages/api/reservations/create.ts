@@ -90,15 +90,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .insert([{
           usuario_id,
           lugar_id,
-          categoria: lugar.categoria,
+          categoria: lugar.categoria || 'outro',
           data_hora: date.toISOString(),
           num_pessoas,
           status: 'PENDENTE',
-          observacoes: observacoes || null,
-          tipo: finalTipo,
           criado_em: new Date().toISOString(),
         }])
-        .select('id, usuario_id, lugar_id, data_hora, num_pessoas, status, tipo')
+        .select()
         .single();
 
       if (insertError) {
@@ -139,7 +137,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await supabase.from('notificacoes').insert([{
           usuario_id: agentId,
           titulo: isRestaurante ? 'Nova Reserva Presencial' : 'Nova Reserva Recebida',
-          mensagem: `Você tem uma nova reserva ${finalTipo === 'delivery' ? 'para entrega' : 'presencial'} de ${customer?.nome || 'um cliente'} para ${dateStr} às ${timeStr}.`,
+          mensagem: `Você tem uma nova reserva de ${customer?.nome || 'um cliente'} para ${dateStr} às ${timeStr}.`,
           tipo: 'reserva',
           dados: {
             reservation_id: insertedReservation.id,
@@ -148,8 +146,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             date: dateStr,
             time: timeStr,
             num_pessoas,
-            tipo: finalTipo,
-            observacoes: observacoes || null,
           },
           lida: false,
           criado_em: new Date().toISOString(),
@@ -161,7 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         await supabase.from('suporte_mensagens').insert([{
           usuario_id: agentId,
-          mensagem: `📋 Nova reserva ${finalTipo === 'delivery' ? '(entrega)' : '(presencial)'}: ${customer?.nome || 'Cliente'} reservou ${lugar.nome} para ${dateStr} às ${timeStr} (${num_pessoas} pessoa${num_pessoas > 1 ? 's' : ''}).${observacoes ? ` Obs: ${observacoes}` : ''}`,
+          mensagem: `📋 Nova reserva: ${customer?.nome || 'Cliente'} reservou ${lugar.nome} para ${dateStr} às ${timeStr} (${num_pessoas} pessoa${num_pessoas > 1 ? 's' : ''}).`,
           tipo: 'reserva',
           criado_em: new Date().toISOString(),
         }]);
