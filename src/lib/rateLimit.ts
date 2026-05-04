@@ -125,12 +125,12 @@ async function useRedis(): Promise<Redis | null> {
 const rateLimits = {
   perUser: {
     windowMs: 60 * 1000,
-    maxRequests: 1,
+    maxRequests: 10,
     keyPrefix: 'ratelimit:user',
   },
   attemptsPerUser: {
     windowMs: 60 * 60 * 1000,
-    maxRequests: 3,
+    maxRequests: 20,
     keyPrefix: 'ratelimit:attempts:user',
   },
   perIP: {
