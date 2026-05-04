@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { result: lugar } = await withTiming(async () => {
         const { data } = await supabase
           .from('lugares')
-          .select('id, nome, usuario_id')
+          .select('id, nome, usuario_id, categoria')
           .eq('id', lugar_id)
           .single();
         return data;
@@ -52,6 +52,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await logApiRequest({ correlationId, req, startTime }, 'reservation_failed', 'failure', { reason: 'establishment_not_found' });
         return res.status(404).json({ success: false, message: 'Estabelecimento não encontrado' });
       }
+
+      const isRestaurante = lugar.categoria?.toLowerCase() === 'restaurante';
+
+      if (isRestaurante && tipo === 'delivery') {
+        await logApiRequest({ correlationId, req, startTime }, 'reservation_failed', 'failure', { reason: 'restaurant_no_delivery' });
+        return res.status(400).json({
+          success: false,
+          message: 'Restaurantes não oferecem serviço de entrega. Apenas reservas presenciais.',
+        });
+      }
+
+      const finalTipo = isRestaurante ? 'presencial' : (tipo || 'presencial');
 
       const date = new Date(data_hora);
       const dateStr = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
@@ -76,16 +88,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .insert([{
           usuario_id,
           lugar_id,
-          categoria,
+          categoria: lugar.categoria,
           data_hora: date.toISOString(),
           num_pessoas,
           status: 'PENDENTE',
           observacoes: observacoes || null,
-          tipo: tipo || 'presencial',
-          endereco: endereco || null,
+          tipo: finalTipo,
+          endereco: finalTipo === 'delivery' ? (endereco || null) : null,
           criado_em: new Date().toISOString(),
         }])
-        .select('id, usuario_id, lugar_id, data_hora, num_pessoas, status')
+        .select('id, usuario_id, lugar_id, data_hora, num_pessoas, status, tipo')
         .single();
 
       if (error) throw error;
@@ -106,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           date: dateStr,
           time: timeStr,
           numPessoas: num_pessoas,
-          tipo: tipo || 'presencial',
+          tipo: finalTipo,
           observacoes: observacoes || undefined,
         });
 
@@ -118,8 +130,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await Promise.all([
         supabase.from('notificacoes').insert([{
           usuario_id: agentId,
-          titulo: 'Nova Reserva Recebida',
-          mensagem: `Você tem uma nova reserva de ${customer?.nome || 'um cliente'} para ${dateStr} às ${timeStr}.`,
+          titulo: isRestaurante ? 'Nova Reserva Presencial' : 'Nova Reserva Recebida',
+          mensagem: `Você tem uma nova reserva ${finalTipo === 'delivery' ? 'para entrega' : 'presencial'} de ${customer?.nome || 'um cliente'} para ${dateStr} às ${timeStr}.`,
           tipo: 'reserva',
           dados: {
             reservation_id: insertedReservation.id,
@@ -128,7 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             date: dateStr,
             time: timeStr,
             num_pessoas,
-            tipo: tipo || 'presencial',
+            tipo: finalTipo,
             observacoes: observacoes || null,
           },
           lida: false,
@@ -136,7 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }]),
         supabase.from('suporte_mensagens').insert([{
           usuario_id: agentId,
-          mensagem: `📋 Nova reserva: ${customer?.nome || 'Cliente'} reservou ${lugar.nome} para ${dateStr} às ${timeStr} (${num_pessoas} pessoa${num_pessoas > 1 ? 's' : ''}).${observacoes ? ` Obs: ${observacoes}` : ''}`,
+          mensagem: `📋 Nova reserva ${finalTipo === 'delivery' ? '(entrega)' : '(presencial)'}: ${customer?.nome || 'Cliente'} reservou ${lugar.nome} para ${dateStr} às ${timeStr} (${num_pessoas} pessoa${num_pessoas > 1 ? 's' : ''}).${observacoes ? ` Obs: ${observacoes}` : ''}`,
           tipo: 'reserva',
           criado_em: new Date().toISOString(),
         }]),
