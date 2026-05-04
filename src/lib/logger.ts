@@ -18,7 +18,11 @@ export type EventType =
   | 'reservation_cancelled'
   | 'reservation_failed'
   | 'reservation_listed'
-  | 'establishment_searched';
+  | 'reservation_status_updated'
+  | 'establishment_searched'
+  | 'location_access_check'
+  | 'location_coordinates_fetched'
+  | 'reservations_with_location_access_fetched';
 
 export type EventStatus = 'success' | 'failure' | 'rate_limited' | 'blocked';
 
