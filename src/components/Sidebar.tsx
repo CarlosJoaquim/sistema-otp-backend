@@ -17,6 +17,15 @@ const sections = [
   { id: 'logs', label: 'Logs', icon: 'fas fa-clock-rotate-left' },
 ];
 
+const businessSections = [
+  { id: 'reservations', label: 'Reservas', icon: 'fas fa-calendar-check' },
+  { id: 'establishments', label: 'Estabelecimentos', icon: 'fas fa-store' },
+  { id: 'agent-orders', label: 'Pedidos do Agente', icon: 'fas fa-receipt' },
+  { id: 'agent-reservations', label: 'Reservas do Agente', icon: 'fas fa-calendar-days' },
+  { id: 'agent-messages', label: 'Mensagens do Agente', icon: 'fas fa-paper-plane' },
+  { id: 'error-reports', label: 'Relatórios de Erros', icon: 'fas fa-bug' },
+];
+
 const adminSections = [
   { id: 'admin-users', label: 'Gestão de Usuários', icon: 'fas fa-user-gear' },
   { id: 'admin-otps', label: 'Gestão de OTPs', icon: 'fas fa-lock' },
@@ -42,6 +51,27 @@ const Sidebar: FC<SidebarProps> = ({ currentSection, onSectionChange }) => {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Principal</p>
           <ul className="space-y-1">
             {sections.map(section => (
+              <li key={section.id}>
+                <button
+                  onClick={() => onSectionChange(section.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                    currentSection === section.id
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  <i className={`${section.icon} w-5 text-center`}></i>
+                  {section.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Negócio</p>
+          <ul className="space-y-1">
+            {businessSections.map(section => (
               <li key={section.id}>
                 <button
                   onClick={() => onSectionChange(section.id)}

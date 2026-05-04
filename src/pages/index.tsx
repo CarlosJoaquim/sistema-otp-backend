@@ -9,6 +9,12 @@ import PasswordReset from '../components/PasswordReset';
 import Logs from '../components/Logs';
 import AdminMetrics from '../components/AdminMetrics';
 import Register from '../components/Register';
+import ReservationsTable from '../components/ReservationsTable';
+import EstablishmentsTable from '../components/EstablishmentsTable';
+import AgentOrdersTable from '../components/AgentOrdersTable';
+import AgentReservationsTable from '../components/AgentReservationsTable';
+import AgentMessages from '../components/AgentMessages';
+import ErrorReportsTable from '../components/ErrorReportsTable';
 import { getAdminAuth, clearAdminAuth, authHeaders } from '../lib/api';
 
 const LOGO_URL = 'https://caop-b.com/assets/Caop-B-Logo-PNG.png';
@@ -131,6 +137,12 @@ export default function Dashboard() {
     'admin-users': 'Gestão de Usuários',
     'admin-otps': 'Gestão de OTPs',
     'cleanup': 'Limpeza',
+    'reservations': 'Reservas',
+    'establishments': 'Estabelecimentos',
+    'agent-orders': 'Pedidos do Agente',
+    'agent-reservations': 'Reservas do Agente',
+    'agent-messages': 'Mensagens do Agente',
+    'error-reports': 'Relatórios de Erros',
   };
 
   const renderSection = () => {
@@ -160,6 +172,18 @@ export default function Dashboard() {
         return <Logs />;
       case 'admin-metrics':
         return <AdminMetrics />;
+      case 'reservations':
+        return <ReservationsTable />;
+      case 'establishments':
+        return <EstablishmentsTable />;
+      case 'agent-orders':
+        return <AgentOrdersTable />;
+      case 'agent-reservations':
+        return <AgentReservationsTable />;
+      case 'agent-messages':
+        return <AgentMessages />;
+      case 'error-reports':
+        return <ErrorReportsTable />;
       default:
         return <Overview stats={stats} />;
     }
