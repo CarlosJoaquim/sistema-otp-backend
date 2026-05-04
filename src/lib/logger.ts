@@ -27,7 +27,12 @@ export type EventType =
   | 'error_reported'
   | 'api_request'
   | 'api_error'
-  | 'validation_error';
+  | 'validation_error'
+  | 'agent_orders_listed'
+  | 'agent_order_status_updated'
+  | 'agent_reservations_listed'
+  | 'agent_reservation_status_updated'
+  | 'agent_message_sent';
 
 export type EventStatus = 'success' | 'failure' | 'rate_limited' | 'blocked';
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
