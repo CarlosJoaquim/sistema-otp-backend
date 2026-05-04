@@ -1,4 +1,5 @@
 import supabase from './supabase';
+import { NextApiRequest, NextApiResponse } from 'next';
 
 export type EventType =
   | 'otp_sent'
@@ -22,9 +23,14 @@ export type EventType =
   | 'establishment_searched'
   | 'location_access_check'
   | 'location_coordinates_fetched'
-  | 'reservations_with_location_access_fetched';
+  | 'reservations_with_location_access_fetched'
+  | 'error_reported'
+  | 'api_request'
+  | 'api_error'
+  | 'validation_error';
 
 export type EventStatus = 'success' | 'failure' | 'rate_limited' | 'blocked';
+export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
 export interface LogEntry {
   correlation_id: string;
@@ -39,8 +45,61 @@ export interface LogEntry {
   metadata?: Record<string, any>;
 }
 
+export interface LogContext {
+  correlationId?: string;
+  userId?: string;
+  req?: NextApiRequest;
+  res?: NextApiResponse;
+  startTime?: number;
+}
+
 export const generateCorrelationId = (): string => {
   return `corr_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+};
+
+const isDev = process.env.NODE_ENV === 'development';
+
+const formatLog = (level: LogLevel, message: string, context?: Record<string, any>) => {
+  const timestamp = new Date().toISOString();
+  const parts = [
+    `[${timestamp}]`,
+    `[${level.toUpperCase()}]`,
+    message,
+  ];
+
+  if (context && Object.keys(context).length > 0) {
+    parts.push(JSON.stringify(context));
+  }
+
+  return parts.join(' ');
+};
+
+export const logger = {
+  info: (message: string, context?: Record<string, any>) => {
+    if (isDev) {
+      console.log(formatLog('info', message, context));
+    }
+  },
+
+  warn: (message: string, context?: Record<string, any>) => {
+    console.warn(formatLog('warn', message, context));
+  },
+
+  error: (message: string, context?: Record<string, any>) => {
+    console.error(formatLog('error', message, context));
+  },
+
+  debug: (message: string, context?: Record<string, any>) => {
+    if (isDev) {
+      console.debug(formatLog('debug', message, context));
+    }
+  },
+};
+
+export const withTiming = async <T>(fn: () => Promise<T>): Promise<{ result: T; duration: number }> => {
+  const start = Date.now();
+  const result = await fn();
+  return { result, duration: Date.now() - start };
 };
 
 export const logEvent = async (entry: Omit<LogEntry, 'timestamp'>) => {
@@ -60,6 +119,21 @@ export const logEvent = async (entry: Omit<LogEntry, 'timestamp'>) => {
   } catch (error) {
     console.error('Erro ao registrar evento:', error);
   }
+};
+
+export const logApiRequest = async (context: LogContext, eventType: EventType, status: EventStatus, metadata?: Record<string, any>) => {
+  const entry: Omit<LogEntry, 'timestamp'> = {
+    correlation_id: context.correlationId || generateCorrelationId(),
+    event_type: eventType,
+    status,
+    email: (context.req?.body as any)?.email,
+    ip_address: context.req?.headers['x-forwarded-for'] as string || context.req?.socket.remoteAddress,
+    user_agent: context.req?.headers['user-agent'] as string,
+    time_elapsed_ms: context.startTime ? Date.now() - context.startTime : undefined,
+    metadata,
+  };
+
+  await logEvent(entry);
 };
 
 // Métricas para o dashboard
